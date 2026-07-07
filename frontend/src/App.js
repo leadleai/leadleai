@@ -8,6 +8,12 @@ import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Onboarding from "@/pages/Onboarding";
+import Pricing from "@/pages/Pricing";
+import Contact from "@/pages/Contact";
+import Privacy from "@/pages/legal/Privacy";
+import Terms from "@/pages/legal/Terms";
+import CookiePolicy from "@/pages/legal/CookiePolicy";
+import NotFound from "@/pages/NotFound";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 import Dashboard from "@/pages/app/Dashboard";
@@ -35,6 +41,11 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/app" element={<DashboardLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="leads" element={<Leads />} />
@@ -50,6 +61,7 @@ function App() {
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
             </Route>
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
         <Toaster position="top-right" richColors />

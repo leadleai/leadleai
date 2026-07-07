@@ -1,60 +1,39 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Zap, Sun, Moon, Menu, ArrowRight, Search, Microscope, Mail, Phone,
+  ArrowRight, Search, Microscope, Mail, Phone,
   CalendarClock, Workflow, Brain, BarChart3, Check, Star, Sparkles, Play, Shield
 } from "lucide-react";
-import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger
 } from "@/components/ui/accordion";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import MarketingNav from "@/components/marketing/MarketingNav";
+import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { features, workflowSteps, testimonials, pricing, faqs } from "@/lib/mockData";
 
 const iconMap = { Search, Microscope, Mail, Phone, CalendarClock, Workflow, Brain, BarChart3, Sparkles };
 
-function Nav() {
-  const { theme, toggle } = useTheme();
-  const navigate = useNavigate();
-  return (
-    <header className="fixed top-0 w-full z-50 glass border-b border-slate-200/60 dark:border-slate-800">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" fill="white" />
-          </div>
-          <span className="font-heading font-bold text-lg tracking-tight">LeadPilot AI</span>
-        </Link>
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
-          <a href="#features" className="hover:text-slate-900 dark:hover:text-white transition">Features</a>
-          <a href="#workflow" className="hover:text-slate-900 dark:hover:text-white transition">How it works</a>
-          <a href="#pricing" className="hover:text-slate-900 dark:hover:text-white transition">Pricing</a>
-          <a href="#faq" className="hover:text-slate-900 dark:hover:text-white transition">FAQ</a>
-        </nav>
-        <div className="flex items-center gap-2">
-          <Button data-testid="landing-theme-toggle" variant="ghost" size="icon" onClick={toggle} className="rounded-xl">
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
-          <Button data-testid="nav-login-btn" variant="ghost" onClick={() => navigate("/login")} className="rounded-full hidden sm:inline-flex">Log in</Button>
-          <Button data-testid="nav-signup-btn" onClick={() => navigate("/signup")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg hover:-translate-y-0.5 transition-all">Start Free Trial</Button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 export default function Landing() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const id = location.state?.scrollTo;
+    if (id) {
+      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [location.state]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-100">
-      <Nav />
+      <MarketingNav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-24">
+      <section className="relative overflow-hidden pt-32 pb-24 scroll-mt-20">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900 animate-gradient" />
         <div className="absolute inset-0 grain opacity-60" />
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-indigo-400/20 dark:bg-indigo-600/10 rounded-full blur-3xl" />
@@ -88,7 +67,7 @@ export default function Landing() {
       </section>
 
       {/* Animated workflow */}
-      <section id="workflow" className="py-20 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800">
+      <section id="workflow" className="py-20 scroll-mt-20 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800">
         <div className="max-w-6xl mx-auto px-5 sm:px-8">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600 text-center">The Autonomous Workflow</p>
           <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-center mt-2">One AI employee. The entire sales cycle.</h2>
@@ -119,7 +98,7 @@ export default function Landing() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-24">
+      <section id="features" className="py-24 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <div className="text-center max-w-2xl mx-auto">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">Capabilities</p>
@@ -169,7 +148,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-24">
+      <section id="pricing" className="py-24 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-5 sm:px-8">
           <div className="text-center max-w-2xl mx-auto">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">Pricing</p>
@@ -192,7 +171,7 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-                <Button data-testid={`pricing-cta-${p.name.toLowerCase()}`} onClick={() => navigate("/signup")}
+                <Button data-testid={`pricing-cta-${p.name.toLowerCase()}`} onClick={() => navigate(p.name === "Enterprise" ? "/contact" : "/signup")}
                   className={`mt-7 rounded-full ${p.popular ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg" : "bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-slate-800"}`}>
                   {p.cta}
                 </Button>
@@ -203,7 +182,7 @@ export default function Landing() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-24 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800">
+      <section id="faq" className="py-24 scroll-mt-20 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-200 dark:border-slate-800">
         <div className="max-w-3xl mx-auto px-5 sm:px-8">
           <div className="text-center">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">FAQ</p>
@@ -238,32 +217,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 py-12">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 grid grid-cols-2 md:grid-cols-5 gap-8">
-          <div className="col-span-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center"><Zap className="w-4 h-4 text-white" fill="white" /></div>
-              <span className="font-heading font-bold">LeadPilot AI</span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 max-w-xs">The autonomous AI sales employee that finds, researches, and closes — while you sleep.</p>
-          </div>
-          {[
-            { h: "Product", items: ["Features", "Pricing", "Integrations", "Changelog"] },
-            { h: "Company", items: ["About", "Careers", "Blog", "Contact"] },
-            { h: "Legal", items: ["Privacy", "Terms", "Security", "GDPR"] },
-          ].map((col) => (
-            <div key={col.h}>
-              <p className="font-semibold text-sm">{col.h}</p>
-              <ul className="mt-3 space-y-2">
-                {col.items.map((it) => <li key={it}><a href="#features" className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">{it}</a></li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 mt-10 pt-6 border-t border-slate-200 dark:border-slate-800 text-sm text-slate-400">
-          © 2025 LeadPilot AI. All rights reserved.
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

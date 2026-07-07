@@ -1,19 +1,28 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MailCheck } from "lucide-react";
+import { MailCheck, Loader2 } from "lucide-react";
 import AuthShell from "./AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const submit = (e) => {
     e.preventDefault();
-    setSent(true);
-    toast.success("Reset link sent — check your inbox");
+    if (!email.trim()) return setError("Email is required");
+    if (!emailRe.test(email)) return setError("Enter a valid email address");
+    setError("");
+    setLoading(true);
+    setTimeout(() => { setLoading(false); setSent(true); toast.success("Reset link sent — check your inbox"); }, 1100);
   };
   return (
     <AuthShell title={sent ? "Check your email" : "Reset your password"} subtitle={sent ? "We've sent a password reset link to your inbox." : "Enter your email and we'll send you a reset link."}>
@@ -26,9 +35,11 @@ export default function ForgotPassword() {
           <Link to="/login"><Button data-testid="back-to-login" variant="outline" className="w-full h-11 rounded-full">Back to login</Button></Link>
         </motion.div>
       ) : (
-        <form onSubmit={submit} className="space-y-4" data-testid="forgot-form">
-          <div className="space-y-2"><Label>Email</Label><Input data-testid="forgot-email" type="email" placeholder="you@company.com" className="rounded-xl h-11" required /></div>
-          <Button data-testid="forgot-submit" type="submit" className="w-full h-11 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg">Send reset link</Button>
+        <form onSubmit={submit} className="space-y-4" data-testid="forgot-form" noValidate>
+          <div className="space-y-1.5"><Label>Email</Label><Input data-testid="forgot-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className={`rounded-xl h-11 ${error ? "border-rose-400" : ""}`} />{error && <p className="text-xs text-rose-500" data-testid="forgot-email-error">{error}</p>}</div>
+          <Button data-testid="forgot-submit" type="submit" disabled={loading} className="w-full h-11 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg">
+            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</> : "Send reset link"}
+          </Button>
           <p className="text-center text-sm text-slate-500 mt-4"><Link to="/login" className="text-indigo-600 font-medium hover:underline">← Back to login</Link></p>
         </form>
       )}
