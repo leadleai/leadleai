@@ -1,55 +1,60 @@
-import { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { ThemeProvider } from "@/lib/theme";
+import { Toaster } from "@/components/ui/sonner";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import Landing from "@/pages/Landing";
+import Login from "@/pages/auth/Login";
+import Signup from "@/pages/auth/Signup";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import Onboarding from "@/pages/Onboarding";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import Dashboard from "@/pages/app/Dashboard";
+import Leads from "@/pages/app/Leads";
+import Research from "@/pages/app/Research";
+import Campaigns from "@/pages/app/Campaigns";
+import Emails from "@/pages/app/Emails";
+import Calls from "@/pages/app/Calls";
+import Meetings from "@/pages/app/Meetings";
+import CRM from "@/pages/app/CRM";
+import Analytics from "@/pages/app/Analytics";
+import Automation from "@/pages/app/Automation";
+import KnowledgeBase from "@/pages/app/KnowledgeBase";
+import Integrations from "@/pages/app/Integrations";
+import Settings from "@/pages/app/Settings";
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <ThemeProvider>
+      <div className="App">
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/app" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="leads" element={<Leads />} />
+              <Route path="research" element={<Research />} />
+              <Route path="campaigns" element={<Campaigns />} />
+              <Route path="emails" element={<Emails />} />
+              <Route path="calls" element={<Calls />} />
+              <Route path="meetings" element={<Meetings />} />
+              <Route path="crm" element={<CRM />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="automation" element={<Automation />} />
+              <Route path="knowledge" element={<KnowledgeBase />} />
+              <Route path="integrations" element={<Integrations />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+        <Toaster position="top-right" richColors />
+      </div>
+    </ThemeProvider>
   );
 }
 
