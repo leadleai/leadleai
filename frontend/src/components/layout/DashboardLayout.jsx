@@ -102,7 +102,7 @@ function AIAssistant() {
         data-testid="ai-assistant-fab"
         onClick={() => setOpen(true)}
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white"
+        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white"
       >
         <Sparkles className="w-6 h-6" />
       </motion.button>
