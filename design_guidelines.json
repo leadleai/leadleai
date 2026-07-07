@@ -1,138 +1,97 @@
 {
-  "theme": "Light",
-  "archetype": "Archetype 4 (Swiss & High-Contrast) merged with soft touches of Archetype 3 for a premium, clean, modern AI SaaS feel",
-  "typography": {
-    "fonts": {
-      "heading": "Outfit, sans-serif",
-      "body": "Inter, sans-serif",
-      "mono": "JetBrains Mono, monospace"
-    },
-    "hierarchy": {
-      "h1": "text-5xl sm:text-6xl tracking-tight font-semibold text-slate-900",
-      "h2": "text-3xl sm:text-4xl tracking-tight font-semibold text-slate-900",
-      "h3": "text-xl sm:text-2xl font-medium text-slate-900",
-      "h4": "text-lg sm:text-xl font-medium text-slate-900",
-      "body": "text-base text-slate-600 leading-relaxed",
-      "small": "text-sm text-slate-500",
-      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-indigo-600"
-    }
-  },
+  "theme": "dark",
+  "archetype": "Swiss & High-Contrast / Luxury Monochrome",
   "colors": {
-    "background": {
-      "default": "#FAFAFA",
-      "gradient_subtle": "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50"
+    "background": "#000000",
+    "foreground": "#FFFFFF",
+    "surface": "#0A0A0A",
+    "surface_foreground": "#FFFFFF",
+    "border": "#222222",
+    "primary": "#FFFFFF",
+    "primary_foreground": "#000000",
+    "secondary": "transparent",
+    "secondary_foreground": "#FFFFFF",
+    "muted": "#1A1A1A",
+    "muted_foreground": "#A3A3A3",
+    "accent": "#111111",
+    "accent_foreground": "#FFFFFF",
+    "destructive": "#333333",
+    "destructive_foreground": "#FFFFFF",
+    "ring": "#FFFFFF",
+    "chart_1": "#FFFFFF",
+    "chart_2": "#CCCCCC",
+    "chart_3": "#999999",
+    "chart_4": "#666666",
+    "chart_5": "#333333"
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Outfit",
+      "weights": ["300", "400", "600", "800"],
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tighter",
+      "h2": "text-3xl sm:text-4xl font-bold tracking-tight",
+      "h3": "text-2xl sm:text-3xl font-semibold tracking-tight",
+      "h4": "text-xl sm:text-2xl font-medium tracking-tight",
+      "note": "Use uppercase for subheadings/labels with wide tracking (tracking-[0.2em])."
     },
-    "surface": {
-      "card": "#FFFFFF",
-      "sidebar": "#FFFFFF",
-      "glass": "bg-white/70 backdrop-blur-xl border border-white/20",
-      "elevated": "#FFFFFF"
-    },
-    "primary": {
-      "default": "#0F172A",
-      "hover": "#1E293B",
-      "gradient": "bg-gradient-to-r from-indigo-600 to-purple-600"
-    },
-    "text": {
-      "primary": "#0F172A",
-      "secondary": "#475569",
-      "tertiary": "#94A3B8",
-      "inverse": "#FFFFFF"
-    },
-    "border": {
-      "default": "#E2E8F0",
-      "subtle": "#F1F5F9"
+    "body": {
+      "font_family": "Inter",
+      "weights": ["300", "400"],
+      "base": "text-base text-neutral-400 font-light leading-relaxed",
+      "small": "text-sm text-neutral-500 font-light"
     }
   },
-  "layout": {
-    "spacing_scale": "Generous. Use p-6, p-8, p-12 for containers.",
-    "border_radius": {
-      "card": "rounded-2xl",
-      "button": "rounded-full",
-      "input": "rounded-xl",
-      "badge": "rounded-full"
-    },
-    "shadows": {
-      "sm": "shadow-[0_2px_8px_rgba(15,23,42,0.04)]",
-      "md": "shadow-[0_8px_24px_rgba(15,23,42,0.06)]",
-      "lg": "shadow-[0_16px_48px_rgba(15,23,42,0.08)]",
-      "glass": "shadow-[0_8px_32px_rgba(15,23,42,0.04)]"
-    },
-    "grids": {
-      "marketing": "grid-cols-1 md:grid-cols-12 gap-8",
-      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
-      "bento": "grid-cols-1 md:grid-cols-3 gap-6"
-    }
+  "buttons": {
+    "primary": "bg-white text-black hover:bg-neutral-200 rounded-full font-medium px-8 py-3 transition-colors",
+    "secondary": "bg-transparent text-white border border-neutral-800 hover:bg-neutral-900 rounded-full font-medium px-8 py-3 transition-colors",
+    "ghost": "bg-transparent text-neutral-400 hover:text-white transition-colors"
   },
   "components": {
-    "buttons": {
-      "primary": "rounded-full bg-slate-900 text-white hover:bg-slate-800 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2",
-      "gradient": "rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2",
-      "secondary": "rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2"
-    },
-    "cards": {
-      "default": "bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8",
-      "glass": "bg-white/70 backdrop-blur-xl border border-white/40 rounded-2xl shadow-glass p-6 sm:p-8"
-    },
-    "inputs": {
-      "default": "bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900"
-    }
+    "card": "bg-[#0A0A0A] border border-[#222222] rounded-xl shadow-none overflow-hidden p-6 sm:p-8",
+    "input": "bg-[#0A0A0A] border border-[#222222] text-white rounded-lg focus:ring-1 focus:ring-white focus:border-white transition-all",
+    "table": "border-collapse w-full text-left text-sm text-neutral-300",
+    "table_header": "border-b border-[#222222] text-neutral-500 font-medium py-4",
+    "table_row": "border-b border-[#222222] hover:bg-[#111111] transition-colors",
+    "badge": "bg-[#1A1A1A] text-white border border-[#333333] rounded-full px-3 py-1 text-xs font-medium"
   },
-  "interactions": {
-    "hover": "Subtle lifts (-translate-y-1) for cards, background color shifts for buttons",
-    "animation": "Use framer-motion for page transitions, staggered list items, and smooth layout changes",
-    "loaders": "Skeleton loaders matching rounded-2xl/rounded-xl shapes with a subtle pulse animation"
+  "layout_and_spacing": {
+    "container": "max-w-7xl mx-auto px-6 sm:px-8",
+    "section_gap": "py-24 sm:py-32",
+    "grid": "grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-8",
+    "hero_overlay": "bg-black/40",
+    "nav": "sticky top-0 w-full z-50 bg-black/60 backdrop-blur-xl border-b border-white/10"
   },
-  "media": {
-    "hero_backgrounds": [
+  "imagery": {
+    "hero_portrait": {
+      "url": "https://images.unsplash.com/photo-1540172777610-b15b605dd68d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwyfHxibGFjayUyMGFuZCUyMHdoaXRlJTIwcG9ydHJhaXQlMjBkcmFtYXRpY3xlbnwwfHx8fDE3ODM0NTU2NzR8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dramatic B&W portrait of a woman's face, ideal for hero background overlay."
+    },
+    "hero_portrait_alt": {
+      "url": "https://images.unsplash.com/photo-1518611540400-6b85a0704342?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwzfHxibGFjayUyMGFuZCUyMHdoaXRlJTIwcG9ydHJhaXQlMjBkcmFtYXRpY3xlbnwwfHx8fDE3ODM0NTU2NzR8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dramatic B&W portrait with strong shadows, usable for split sections."
+    },
+    "background_texture": {
+      "url": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRhcmslMjBncmV5JTIwdGV4dHVyZXxlbnwwfHx8fDE3ODM0NTU2NzV8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark abstract grey texture for section backgrounds."
+    },
+    "company_logos": [
       {
-        "url": "https://images.unsplash.com/photo-1614851099511-773084f6911d",
-        "category": "hero_bg",
-        "description": "Abstract subtle light illustration to be used at low opacity (10-20%) behind the glassmorphism hero for an AI vibe."
+        "url": "https://images.pexels.com/photos/26576975/pexels-photo-26576975.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "name": "Favour Media"
       },
       {
-        "url": "https://images.unsplash.com/photo-1604079628040-94301bb21b91",
-        "category": "hero_bg",
-        "description": "Bright, soft background to mix for gradient vibes."
-      }
-    ],
-    "avatars": [
-      {
-        "url": "https://images.pexels.com/photos/12931653/pexels-photo-12931653.jpeg",
-        "category": "testimonial_avatar",
-        "description": "Professional woman headshot for testimonials/team."
-      },
-      {
-        "url": "https://images.pexels.com/photos/10816007/pexels-photo-10816007.jpeg",
-        "category": "testimonial_avatar",
-        "description": "Professional man headshot for testimonials/team."
-      }
-    ],
-    "logos": [
-      {
-        "url": "https://images.pexels.com/photos/21898300/pexels-photo-21898300.jpeg",
-        "category": "integration_logo",
-        "description": "Use as a placeholder for integration cards if lucide icons are not sufficient."
-      },
-      {
-        "url": "https://images.pexels.com/photos/9683980/pexels-photo-9683980.jpeg",
-        "category": "company_banner",
-        "description": "Microsoft building image (can be used as a company banner/background in the CRM research panel)."
+        "url": "https://images.pexels.com/photos/21898300/pexels-photo-21898300.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "name": "Pexels"
       }
     ]
   },
   "instructions_to_main_agent": [
-    "Ensure global layout uses 'min-h-screen bg-slate-50 selection:bg-indigo-100 text-slate-900'.",
-    "Import Outfit font for headings and Inter for body text via Google Fonts in index.css.",
-    "Use lucide-react for all standard icons, sizing them appropriately (w-5 h-5 for inline, larger for empty states).",
-    "For the marketing page, use a glassmorphism sticky header: 'fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md border-b border-slate-200/50'.",
-    "The Dashboard must have a sidebar ('w-64 border-r border-slate-200 bg-white') and a top navbar for search/profile.",
-    "Use realistic mock data for leads, emails, and CRM. Avoid generic 'Test 1', 'Test 2'. Use names like 'Acme Corp', 'Sarah Jenkins', etc.",
-    "Ensure all interactive elements have a data-testid attribute for testing (e.g. data-testid='login-submit-button').",
-    "Include a functional Dark Mode toggle (using standard Tailwind 'dark:' variants). Ensure light theme is the absolute default and meticulously styled.",
-    "For the CRM Kanban, visually represent columns as rounded-2xl slate-50/100 containers with white rounded-xl cards inside.",
-    "For empty states, use a light grey icon and a gentle prompt text.",
-    "Implement the landing page hero with an animated workflow pipeline (using framer-motion to show Find Leads -> Research -> Email -> Call -> Book Meeting).",
-    "Build out all requested pages: Landing, Auth, Onboarding, Dashboard, Lead Discovery, Research, Email Studio, Phone Agent, Scheduler, CRM, Analytics, Automations, Knowledge Base, Integrations, Settings."
+    "Strictly adhere to the dark monochrome aesthetic. Do not introduce any colors (no blue, no purple). Use only pure black, white, and shades of gray.",
+    "For the marketing site, use massive typography (up to text-6xl) with Outfit font, tight tracking (-0.05em), and bold weight. Keep body text thin and minimal.",
+    "Primary CTAs must be white pill-shaped buttons with black text. Secondary CTAs are ghost buttons or outlined pills.",
+    "The hero section should have the provided B&W portrait as a background image with a subtle dark gradient/overlay (max 50% opacity) to ensure text readability.",
+    "In the dashboard, rely on 1px subtle gray borders (#222222) and pure black (#000000) or very dark gray (#0A0A0A) backgrounds. Avoid gradients and soft shadows. Use sharp, flat surfaces.",
+    "Charts and data tables must use grayscale series (white to dark gray). No rainbow colors in charts.",
+    "Add 'data-testid' attributes to all interactive and key informational elements."
   ]
 }
