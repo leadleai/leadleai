@@ -28,3 +28,11 @@ Premium, production-ready SaaS frontend "LeadPilot AI" — an Autonomous AI Sale
 - P1: Wire to real backend + AI (Emergent LLM key) for actual lead gen/email drafting
 - P2: Persist onboarding/settings; real auth
 - P2: Real drag-drop lib polish, CSV export
+
+## Update (Dec 2025) — Landing Audit & Missing Pages
+- Extracted shared MarketingNav (mobile hamburger + smooth-scroll, cross-page hash nav) and MarketingFooter (all links wired — no dead links).
+- New pages: /pricing, /contact (validated form + loading + success), /privacy, /terms, /cookies, and 404 catch-all (*).
+- Wired every CTA/footer/pricing link to correct destination; Enterprise CTA -> /contact.
+- Added form validation + loading spinners to Login (+2FA), Signup, Forgot Password, Contact.
+- Global smooth scrolling + scroll-mt offsets on anchored sections.
+- Verified: testing_agent iteration_2 -> 100% frontend, zero dead links, no bugs.
