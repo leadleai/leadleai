@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { leads } from "@/lib/mockData";
 import { toast } from "sonner";
 
-const statusColor = { Hot: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300", Warm: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", Cold: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" };
+const statusColor = { Hot: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300", Warm: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300", Cold: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300" };
 
 export default function Leads() {
   const [query, setQuery] = useState("");
@@ -31,12 +31,12 @@ export default function Leads() {
   return (
     <div>
       <PageHeader title="Lead Discovery" subtitle={`${filtered.length} prospects matching your ideal customer profile`} testid="leads-header"
-        action={<Button data-testid="generate-leads-btn" onClick={() => toast.success("Generating new leads with AI...")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg"><Sparkles className="w-4 h-4 mr-1" /> Generate Leads</Button>} />
+        action={<Button data-testid="generate-leads-btn" onClick={() => toast.success("Generating new leads with AI...")} className="rounded-full bg-white text-black hover:shadow-lg"><Sparkles className="w-4 h-4 mr-1" /> Generate Leads</Button>} />
 
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-        <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-slate-200 dark:border-slate-800">
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
+        <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-neutral-200 dark:border-neutral-800">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             <Input data-testid="leads-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search company or contact..." className="pl-9 rounded-xl" />
           </div>
           <Select value={industry} onValueChange={setIndustry}>
@@ -51,7 +51,7 @@ export default function Leads() {
         </div>
 
         {selected.length > 0 && (
-          <div className="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/10 flex items-center gap-3 text-sm" data-testid="bulk-actions-bar">
+          <div className="px-4 py-2.5 bg-neutral-50 dark:bg-neutral-500/10 flex items-center gap-3 text-sm" data-testid="bulk-actions-bar">
             <span className="font-medium">{selected.length} selected</span>
             <Button size="sm" variant="ghost" className="h-7 rounded-lg" onClick={() => toast.success("Added to campaign")}>Add to campaign</Button>
             <Button size="sm" variant="ghost" className="h-7 rounded-lg" onClick={() => toast.success("Emails generated")}>Generate emails</Button>
@@ -73,14 +73,14 @@ export default function Leads() {
               {filtered.map((l) => (
                 <TableRow key={l.id} className="cursor-pointer" data-testid={`lead-row-${l.id}`}>
                   <TableCell><Checkbox checked={selected.includes(l.id)} onCheckedChange={() => toggle(l.id)} data-testid={`lead-checkbox-${l.id}`} /></TableCell>
-                  <TableCell><div className="font-medium">{l.company}</div><div className="text-xs text-slate-400">{l.website}</div></TableCell>
+                  <TableCell><div className="font-medium">{l.company}</div><div className="text-xs text-neutral-400">{l.website}</div></TableCell>
                   <TableCell>{l.contact}</TableCell>
-                  <TableCell className="text-slate-500 text-sm">{l.title}</TableCell>
-                  <TableCell className="text-slate-500 text-sm">{l.industry}</TableCell>
-                  <TableCell className="text-slate-500 text-sm">{l.employees}</TableCell>
-                  <TableCell className="text-slate-500 text-sm">{l.revenue}</TableCell>
+                  <TableCell className="text-neutral-500 text-sm">{l.title}</TableCell>
+                  <TableCell className="text-neutral-500 text-sm">{l.industry}</TableCell>
+                  <TableCell className="text-neutral-500 text-sm">{l.employees}</TableCell>
+                  <TableCell className="text-neutral-500 text-sm">{l.revenue}</TableCell>
                   <TableCell><Badge variant="secondary" className="rounded-full font-normal">{l.tech}</Badge></TableCell>
-                  <TableCell><div className="flex items-center gap-2"><div className="w-9 text-sm font-semibold">{l.score}</div><div className="w-12 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${l.score}%` }} /></div></div></TableCell>
+                  <TableCell><div className="flex items-center gap-2"><div className="w-9 text-sm font-semibold">{l.score}</div><div className="w-12 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden"><div className="h-full bg-white text-black" style={{ width: `${l.score}%` }} /></div></div></TableCell>
                   <TableCell><Badge className={`rounded-full font-medium border-0 ${statusColor[l.status]}`}>{l.status}</Badge></TableCell>
                 </TableRow>
               ))}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Zap, Sun, Moon, Menu } from "lucide-react";
+import { Sun, Moon, Menu, Plus } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -38,12 +38,10 @@ export default function MarketingNav() {
   };
 
   return (
-    <header className="fixed top-0 w-full z-50 glass border-b border-slate-200/60 dark:border-slate-800">
+    <header className="fixed top-0 w-full z-50 glass border-b border-black/10 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" fill="white" />
-          </div>
+          <Plus className="w-7 h-7 text-foreground" strokeWidth={3} />
           <span className="font-heading font-bold text-lg tracking-tight">LeadPilot AI</span>
         </Link>
 
@@ -61,7 +59,7 @@ export default function MarketingNav() {
             {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
           <Button data-testid="nav-login-btn" variant="ghost" onClick={() => navigate("/login")} className="rounded-full hidden sm:inline-flex">Log in</Button>
-          <Button data-testid="nav-signup-btn" onClick={() => navigate("/signup")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg hover:-translate-y-0.5 transition-all">Start Free Trial</Button>
+          <Button data-testid="nav-signup-btn" onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200 dark:bg-white dark:text-black font-medium">Start Free Trial</Button>
 
           {/* Mobile menu */}
           <Sheet open={open} onOpenChange={setOpen}>
@@ -81,7 +79,7 @@ export default function MarketingNav() {
                   <Button onClick={() => navigate("/login")} variant="outline" className="rounded-full mt-4">Log in</Button>
                 </SheetClose>
                 <SheetClose asChild>
-                  <Button onClick={() => navigate("/signup")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600">Start Free Trial</Button>
+                  <Button onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200">Start Free Trial</Button>
                 </SheetClose>
               </div>
             </SheetContent>

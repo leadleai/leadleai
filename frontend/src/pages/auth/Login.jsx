@@ -50,26 +50,26 @@ export default function Login() {
         <form onSubmit={submitCreds} className="space-y-4" data-testid="login-form" noValidate>
           <div className="space-y-2">
             <Label>Email</Label>
-            <Input data-testid="login-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: undefined })); }} placeholder="you@company.com" className={`rounded-xl h-11 ${errors.email ? "border-rose-400" : ""}`} />
-            {errors.email && <p className="text-xs text-rose-500" data-testid="login-email-error">{errors.email}</p>}
+            <Input data-testid="login-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: undefined })); }} placeholder="you@company.com" className={`rounded-xl h-11 ${errors.email ? "border-neutral-400" : ""}`} />
+            {errors.email && <p className="text-xs text-neutral-500" data-testid="login-email-error">{errors.email}</p>}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Password</Label>
-              <Link to="/forgot-password" data-testid="forgot-link" className="text-xs text-indigo-600 hover:underline">Forgot password?</Link>
+              <Link to="/forgot-password" data-testid="forgot-link" className="text-xs text-neutral-600 hover:underline">Forgot password?</Link>
             </div>
-            <Input data-testid="login-password" type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: undefined })); }} placeholder="••••••••" className={`rounded-xl h-11 ${errors.password ? "border-rose-400" : ""}`} />
-            {errors.password && <p className="text-xs text-rose-500" data-testid="login-password-error">{errors.password}</p>}
+            <Input data-testid="login-password" type="password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: undefined })); }} placeholder="••••••••" className={`rounded-xl h-11 ${errors.password ? "border-neutral-400" : ""}`} />
+            {errors.password && <p className="text-xs text-neutral-500" data-testid="login-password-error">{errors.password}</p>}
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
             <Checkbox data-testid="remember-me" defaultChecked /> Remember me for 30 days
           </label>
-          <Button data-testid="login-submit" type="submit" disabled={loading} className="w-full h-11 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg">
+          <Button data-testid="login-submit" type="submit" disabled={loading} className="w-full h-11 rounded-full bg-white text-black hover:shadow-lg">
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Logging in...</> : "Log in"}
           </Button>
-          <div className="relative py-2"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200 dark:border-slate-800" /></div><span className="relative mx-auto bg-white dark:bg-slate-950 px-3 text-xs text-slate-400">OR CONTINUE WITH</span></div>
+          <div className="relative py-2"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-neutral-200 dark:border-neutral-800" /></div><span className="relative mx-auto bg-white dark:bg-neutral-950 px-3 text-xs text-neutral-400">OR CONTINUE WITH</span></div>
           <SocialButtons testidPrefix="login-social" />
-          <p className="text-center text-sm text-slate-500 mt-4">Don&apos;t have an account? <Link to="/signup" data-testid="to-signup" className="text-indigo-600 font-medium hover:underline">Sign up</Link></p>
+          <p className="text-center text-sm text-neutral-500 mt-4">Don&apos;t have an account? <Link to="/signup" data-testid="to-signup" className="text-neutral-600 font-medium hover:underline">Sign up</Link></p>
         </form>
       ) : (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6" data-testid="twofa-form">
@@ -80,10 +80,10 @@ export default function Login() {
               </InputOTPGroup>
             </InputOTP>
           </div>
-          <Button data-testid="verify-2fa" onClick={verify} disabled={loading} className="w-full h-11 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg">
+          <Button data-testid="verify-2fa" onClick={verify} disabled={loading} className="w-full h-11 rounded-full bg-white text-black hover:shadow-lg">
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & Continue"}
           </Button>
-          <button onClick={() => setStep("credentials")} className="w-full text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white">← Back to login</button>
+          <button onClick={() => setStep("credentials")} className="w-full text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white">← Back to login</button>
         </motion.div>
       )}
     </AuthShell>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,51 +17,56 @@ html {
 @layer base {
     :root {
         --background: 0 0% 100%;
-        --foreground: 222 47% 11%;
+        --foreground: 0 0% 4%;
         --card: 0 0% 100%;
-        --card-foreground: 222 47% 11%;
+        --card-foreground: 0 0% 4%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 47% 11%;
-        --primary: 222 47% 11%;
+        --popover-foreground: 0 0% 4%;
+        --primary: 0 0% 9%;
         --primary-foreground: 0 0% 98%;
-        --secondary: 210 40% 96%;
-        --secondary-foreground: 222 47% 11%;
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
-        --accent: 210 40% 96%;
-        --accent-foreground: 222 47% 11%;
-        --destructive: 0 84% 60%;
+        --secondary: 0 0% 96%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96%;
+        --muted-foreground: 0 0% 40%;
+        --accent: 0 0% 96%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 0% 20%;
         --destructive-foreground: 0 0% 98%;
-        --border: 214 32% 91%;
-        --input: 214 32% 91%;
-        --ring: 243 75% 59%;
-        --chart-1: 243 75% 59%;
-        --chart-2: 262 83% 58%;
-        --chart-3: 199 89% 48%;
-        --chart-4: 160 84% 39%;
-        --chart-5: 38 92% 50%;
+        --border: 0 0% 90%;
+        --input: 0 0% 90%;
+        --ring: 0 0% 4%;
+        --chart-1: 0 0% 10%;
+        --chart-2: 0 0% 35%;
+        --chart-3: 0 0% 55%;
+        --chart-4: 0 0% 70%;
+        --chart-5: 0 0% 85%;
         --radius: 0.75rem;
     }
     .dark {
-        --background: 222 47% 7%;
-        --foreground: 210 40% 98%;
-        --card: 222 44% 10%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222 44% 10%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 210 40% 98%;
-        --primary-foreground: 222 47% 11%;
-        --secondary: 217 33% 17%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 217 33% 17%;
-        --muted-foreground: 215 20% 65%;
-        --accent: 217 33% 17%;
-        --accent-foreground: 210 40% 98%;
-        --destructive: 0 63% 31%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 217 33% 20%;
-        --input: 217 33% 20%;
-        --ring: 243 75% 59%;
+        --background: 0 0% 0%;
+        --foreground: 0 0% 100%;
+        --card: 0 0% 4%;
+        --card-foreground: 0 0% 100%;
+        --popover: 0 0% 4%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 0 0% 100%;
+        --primary-foreground: 0 0% 0%;
+        --secondary: 0 0% 10%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 0 0% 10%;
+        --muted-foreground: 0 0% 64%;
+        --accent: 0 0% 12%;
+        --accent-foreground: 0 0% 100%;
+        --destructive: 0 0% 25%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 14%;
+        --input: 0 0% 16%;
+        --ring: 0 0% 100%;
+        --chart-1: 0 0% 100%;
+        --chart-2: 0 0% 75%;
+        --chart-3: 0 0% 55%;
+        --chart-4: 0 0% 40%;
+        --chart-5: 0 0% 25%;
     }
 }
 
@@ -74,6 +79,7 @@ html {
     }
     h1, h2, h3, h4, h5 {
         font-family: 'Outfit', sans-serif;
+        letter-spacing: -0.02em;
     }
 }
 
@@ -88,16 +94,7 @@ html {
     -webkit-backdrop-filter: blur(16px);
 }
 .dark .glass {
-    background: rgba(17, 24, 39, 0.6);
-}
-
-@keyframes gradient-shift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-}
-.animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 8s ease infinite;
+    background: rgba(0, 0, 0, 0.6);
 }
 
 @keyframes float {
@@ -107,6 +104,16 @@ html {
 .animate-float { animation: float 6s ease-in-out infinite; }
 
 .grain {
-    background-image: radial-gradient(rgba(99,102,241,0.06) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
     background-size: 22px 22px;
 }
+.grain-light {
+    background-image: radial-gradient(rgba(0,0,0,0.04) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+@keyframes halo-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.animate-halo { animation: halo-spin 24s linear infinite; }

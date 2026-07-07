@@ -27,9 +27,9 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="profile">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 max-w-2xl">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl">
             <div className="flex items-center gap-4 mb-6">
-              <Avatar className="w-16 h-16"><AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white text-xl">AJ</AvatarFallback></Avatar>
+              <Avatar className="w-16 h-16"><AvatarFallback className="bg-neutral-900 border border-neutral-800 text-white text-xl">AJ</AvatarFallback></Avatar>
               <Button variant="outline" className="rounded-full" onClick={() => toast.success("Photo updated")}>Change photo</Button>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -37,45 +37,45 @@ export default function Settings() {
               <div className="space-y-2"><Label>Last name</Label><Input defaultValue="Johnson" className="rounded-xl" /></div>
               <div className="space-y-2 sm:col-span-2"><Label>Email</Label><Input defaultValue="alex@vertexlabs.io" className="rounded-xl" /></div>
             </div>
-            <Button data-testid="save-profile-btn" onClick={() => toast.success("Profile saved")} className="mt-6 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600">Save changes</Button>
+            <Button data-testid="save-profile-btn" onClick={() => toast.success("Profile saved")} className="mt-6 rounded-full bg-white text-black">Save changes</Button>
           </div>
         </TabsContent>
 
         <TabsContent value="organization">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
             <div className="space-y-2"><Label>Organization name</Label><Input defaultValue="Vertex Labs" className="rounded-xl" /></div>
             <div className="space-y-2"><Label>Website</Label><Input defaultValue="vertexlabs.io" className="rounded-xl" /></div>
             <div className="space-y-2"><Label>Custom domain</Label><Input defaultValue="mail.vertexlabs.io" className="rounded-xl" /></div>
-            <Button onClick={() => toast.success("Organization updated")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600">Save</Button>
+            <Button onClick={() => toast.success("Organization updated")} className="rounded-full bg-white text-black">Save</Button>
           </div>
         </TabsContent>
 
         <TabsContent value="billing">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 max-w-2xl">
-            <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 p-5 text-white">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl">
+            <div className="flex items-center justify-between rounded-xl bg-neutral-900 border border-neutral-800 p-5 text-white">
               <div><p className="text-white/80 text-sm">Current plan</p><p className="font-heading text-2xl font-bold">Growth · $399/mo</p></div>
               <CreditCard className="w-8 h-8 opacity-80" />
             </div>
             <div className="mt-5 space-y-2 text-sm">
-              {["5,000 AI leads/mo", "AI email + call agents", "Full CRM automation"].map(f => <div key={f} className="flex items-center gap-2 text-slate-600 dark:text-slate-300"><Check className="w-4 h-4 text-indigo-600" />{f}</div>)}
+              {["5,000 AI leads/mo", "AI email + call agents", "Full CRM automation"].map(f => <div key={f} className="flex items-center gap-2 text-neutral-600 dark:text-neutral-300"><Check className="w-4 h-4 text-neutral-600" />{f}</div>)}
             </div>
             <div className="flex gap-3 mt-6">
-              <Button data-testid="upgrade-plan-btn" onClick={() => toast.success("Upgrade flow started")} className="rounded-full bg-slate-900 dark:bg-white dark:text-slate-900">Upgrade plan</Button>
+              <Button data-testid="upgrade-plan-btn" onClick={() => toast.success("Upgrade flow started")} className="rounded-full bg-neutral-900 dark:bg-white dark:text-neutral-900">Upgrade plan</Button>
               <Button variant="outline" className="rounded-full" onClick={() => toast.info("Invoices opened")}>View invoices</Button>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="team">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden max-w-2xl">
-            <div className="flex items-center justify-between px-5 h-14 border-b border-slate-200 dark:border-slate-800">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden max-w-2xl">
+            <div className="flex items-center justify-between px-5 h-14 border-b border-neutral-200 dark:border-neutral-800">
               <span className="font-heading font-semibold">Team members</span>
-              <Button size="sm" data-testid="invite-member-btn" onClick={() => toast.success("Invite sent")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600">Invite</Button>
+              <Button size="sm" data-testid="invite-member-btn" onClick={() => toast.success("Invite sent")} className="rounded-full bg-white text-black">Invite</Button>
             </div>
             {team.map((m) => (
-              <div key={m.email} className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+              <div key={m.email} className="flex items-center gap-3 px-5 py-3 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
                 <Avatar className="w-9 h-9"><AvatarFallback className="text-xs">{m.name.split(" ").map(n=>n[0]).join("")}</AvatarFallback></Avatar>
-                <div className="flex-1"><p className="text-sm font-medium">{m.name}</p><p className="text-xs text-slate-400">{m.email}</p></div>
+                <div className="flex-1"><p className="text-sm font-medium">{m.name}</p><p className="text-xs text-neutral-400">{m.email}</p></div>
                 <Badge variant="secondary" className="rounded-full">{m.role}</Badge>
               </div>
             ))}
@@ -83,23 +83,23 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="security">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
             {[["Two-factor authentication", "Add an extra layer of security", true], ["Single sign-on (SSO)", "Require SSO for all members", false], ["Session timeout", "Auto-logout after inactivity", true]].map(([t, d, on]) => (
               <div key={t} className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-3"><Shield className="w-5 h-5 text-slate-400" /><div><p className="font-medium text-sm">{t}</p><p className="text-xs text-slate-400">{d}</p></div></div>
+                <div className="flex items-center gap-3"><Shield className="w-5 h-5 text-neutral-400" /><div><p className="font-medium text-sm">{t}</p><p className="text-xs text-neutral-400">{d}</p></div></div>
                 <Switch defaultChecked={on} onCheckedChange={() => toast.success(`${t} updated`)} data-testid={`security-${t.toLowerCase().replace(/[^a-z]/g,"-")}`} />
               </div>
             ))}
           </div>
-          <div className="rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50/50 dark:bg-rose-500/5 p-6 max-w-2xl mt-6" data-testid="danger-zone">
-            <div className="flex items-center gap-2 text-rose-600 mb-2"><AlertTriangle className="w-5 h-5" /><h4 className="font-heading font-semibold">Danger Zone</h4></div>
-            <p className="text-sm text-slate-500 mb-4">Permanently delete your workspace and all associated data. This cannot be undone.</p>
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-500/30 bg-neutral-50/50 dark:bg-neutral-500/5 p-6 max-w-2xl mt-6" data-testid="danger-zone">
+            <div className="flex items-center gap-2 text-neutral-600 mb-2"><AlertTriangle className="w-5 h-5" /><h4 className="font-heading font-semibold">Danger Zone</h4></div>
+            <p className="text-sm text-neutral-500 mb-4">Permanently delete your workspace and all associated data. This cannot be undone.</p>
             <Button variant="destructive" className="rounded-full" data-testid="delete-workspace-btn" onClick={() => toast.error("Workspace deletion requires confirmation")}>Delete workspace</Button>
           </div>
         </TabsContent>
 
         <TabsContent value="notifications">
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
             {["Email sent", "Reply received", "Meeting booked", "Lead found", "Workflow completed", "Call completed"].map((n) => (
               <div key={n} className="flex items-center justify-between py-1.5">
                 <p className="font-medium text-sm">{n}</p>

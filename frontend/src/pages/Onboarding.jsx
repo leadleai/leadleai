@@ -49,14 +49,14 @@ export default function Onboarding() {
 
   if (done) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-6">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center max-w-md" data-testid="onboarding-complete">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center mx-auto text-white">
+          <div className="w-20 h-20 rounded-3xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-white">
             <CheckCircle2 className="w-10 h-10" />
           </div>
           <h1 className="font-heading text-3xl font-bold mt-6">You&apos;re all set!</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-3">LeadPilot AI is now scanning for leads, researching accounts, and preparing your first campaign.</p>
-          <Button data-testid="go-to-dashboard" onClick={() => navigate("/app")} className="mt-8 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg px-8 h-12">
+          <p className="text-neutral-500 dark:text-neutral-400 mt-3">LeadPilot AI is now scanning for leads, researching accounts, and preparing your first campaign.</p>
+          <Button data-testid="go-to-dashboard" onClick={() => navigate("/app")} className="mt-8 rounded-full bg-white text-black hover:shadow-lg px-8 h-12">
             Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
           </Button>
         </motion.div>
@@ -67,13 +67,13 @@ export default function Onboarding() {
   const StepIcon = steps[step].icon;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      <header className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+      <header className="h-16 flex items-center px-6 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center"><Zap className="w-5 h-5 text-white" fill="white" /></div>
+          <div className="w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center"><Zap className="w-5 h-5 text-white" fill="white" /></div>
           <span className="font-heading font-bold text-lg">LeadPilot AI</span>
         </div>
-        <button onClick={() => navigate("/app")} data-testid="skip-onboarding" className="ml-auto text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white">Skip for now</button>
+        <button onClick={() => navigate("/app")} data-testid="skip-onboarding" className="ml-auto text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white">Skip for now</button>
       </header>
 
       <div className="flex-1 flex items-center justify-center p-6">
@@ -83,19 +83,19 @@ export default function Onboarding() {
             {steps.map((s, i) => (
               <div key={i} className="flex items-center flex-1 last:flex-none">
                 <div className="flex flex-col items-center gap-2">
-                  <div data-testid={`step-indicator-${i}`} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${i < step ? "bg-emerald-500 text-white" : i === step ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  <div data-testid={`step-indicator-${i}`} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${i < step ? "bg-neutral-500 text-white" : i === step ? "bg-neutral-900 border border-neutral-800 text-white" : "bg-neutral-200 dark:bg-neutral-800 text-neutral-400"}`}>
                     {i < step ? <Check className="w-5 h-5" /> : <s.icon className="w-5 h-5" />}
                   </div>
-                  <span className="text-xs font-medium hidden sm:block text-slate-500">{s.title}</span>
+                  <span className="text-xs font-medium hidden sm:block text-neutral-500">{s.title}</span>
                 </div>
-                {i < steps.length - 1 && <div className={`h-0.5 flex-1 mx-2 ${i < step ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"}`} />}
+                {i < steps.length - 1 && <div className={`h-0.5 flex-1 mx-2 ${i < step ? "bg-neutral-500" : "bg-neutral-200 dark:bg-neutral-800"}`} />}
               </div>
             ))}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600"><StepIcon className="w-5 h-5" /></div>
+              <div className="w-10 h-10 rounded-xl bg-neutral-50 dark:bg-neutral-500/10 flex items-center justify-center text-neutral-600"><StepIcon className="w-5 h-5" /></div>
               <h2 className="font-heading text-xl font-bold">{steps[step].title}</h2>
             </div>
 
@@ -109,7 +109,7 @@ export default function Onboarding() {
                       <div className="space-y-2"><Label>Website</Label><Input data-testid="ob-website" defaultValue="vertexlabs.io" className="rounded-xl h-11" /></div>
                     </div>
                     <div className="space-y-2"><Label>Logo</Label>
-                      <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-6 flex flex-col items-center text-slate-400 cursor-pointer hover:border-indigo-400 transition" data-testid="ob-logo-upload">
+                      <div className="border-2 border-dashed border-neutral-200 dark:border-neutral-700 rounded-xl p-6 flex flex-col items-center text-neutral-400 cursor-pointer hover:border-neutral-400 transition" data-testid="ob-logo-upload">
                         <Upload className="w-6 h-6 mb-2" /><span className="text-sm">Click to upload or drag & drop</span>
                       </div>
                     </div>
@@ -132,10 +132,10 @@ export default function Onboarding() {
                       const isOn = connected.includes(t.name);
                       return (
                         <button key={t.name} data-testid={`ob-tool-${t.name.toLowerCase().replace(/\s+/g,"-")}`} onClick={() => toggleTool(t.name)}
-                          className={`rounded-xl border p-4 flex flex-col items-center gap-2 transition-all ${isOn ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10" : "border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}>
-                          <t.icon className={`w-6 h-6 ${isOn ? "text-indigo-600" : "text-slate-400"}`} />
+                          className={`rounded-xl border p-4 flex flex-col items-center gap-2 transition-all ${isOn ? "border-neutral-500 bg-neutral-50 dark:bg-neutral-500/10" : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300"}`}>
+                          <t.icon className={`w-6 h-6 ${isOn ? "text-neutral-600" : "text-neutral-400"}`} />
                           <span className="text-xs font-medium text-center">{t.name}</span>
-                          {isOn && <span className="text-[10px] text-indigo-600 font-semibold">Connected</span>}
+                          {isOn && <span className="text-[10px] text-neutral-600 font-semibold">Connected</span>}
                         </button>
                       );
                     })}
@@ -147,9 +147,9 @@ export default function Onboarding() {
                       const isOn = selectedGoals.includes(g.name);
                       return (
                         <button key={g.name} data-testid={`ob-goal-${g.name.toLowerCase().replace(/\s+/g,"-")}`} onClick={() => toggleGoal(g.name)}
-                          className={`w-full text-left rounded-xl border p-4 flex items-center gap-3 transition-all ${isOn ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10" : "border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}>
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isOn ? "bg-indigo-600 text-white" : "border border-slate-300 dark:border-slate-600"}`}>{isOn && <Check className="w-3.5 h-3.5" />}</div>
-                          <div><p className="font-medium text-sm">{g.name}</p><p className="text-xs text-slate-500">{g.desc}</p></div>
+                          className={`w-full text-left rounded-xl border p-4 flex items-center gap-3 transition-all ${isOn ? "border-neutral-500 bg-neutral-50 dark:bg-neutral-500/10" : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300"}`}>
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isOn ? "bg-neutral-600 text-white" : "border border-neutral-300 dark:border-neutral-600"}`}>{isOn && <Check className="w-3.5 h-3.5" />}</div>
+                          <div><p className="font-medium text-sm">{g.name}</p><p className="text-xs text-neutral-500">{g.desc}</p></div>
                         </button>
                       );
                     })}
@@ -160,7 +160,7 @@ export default function Onboarding() {
 
             <div className="flex items-center justify-between mt-8">
               <Button data-testid="ob-back" variant="ghost" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0} className="rounded-full"><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-              <Button data-testid="ob-next" onClick={next} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg px-6">
+              <Button data-testid="ob-next" onClick={next} className="rounded-full bg-white text-black hover:shadow-lg px-6">
                 {step === steps.length - 1 ? "Complete setup" : "Continue"} <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </div>

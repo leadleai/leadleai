@@ -30,16 +30,16 @@ export default function Integrations() {
           const Icon = iconMap[it.icon] || Circle;
           return (
             <motion.div key={it.name} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (i % 6) * 0.05 }}
-              className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5" data-testid={`integration-${it.name.toLowerCase().replace(/\s+/g,"-")}`}>
+              className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5" data-testid={`integration-${it.name.toLowerCase().replace(/\s+/g,"-")}`}>
               <div className="flex items-start justify-between">
-                <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><Icon className="w-5 h-5 text-slate-600 dark:text-slate-300" /></div>
-                {it.connected && <Badge className="rounded-full border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"><Check className="w-3 h-3 mr-1" /> Connected</Badge>}
+                <div className="w-11 h-11 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Icon className="w-5 h-5 text-neutral-600 dark:text-neutral-300" /></div>
+                {it.connected && <Badge className="rounded-full border-0 bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300"><Check className="w-3 h-3 mr-1" /> Connected</Badge>}
               </div>
               <h3 className="font-heading font-semibold mt-4">{it.name}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{it.desc}</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{it.desc}</p>
               <Button data-testid={`integration-toggle-${it.name.toLowerCase().replace(/\s+/g,"-")}`} onClick={() => toggle(it.name)}
                 variant={it.connected ? "outline" : "default"}
-                className={`mt-4 w-full rounded-full ${!it.connected ? "bg-slate-900 dark:bg-white dark:text-slate-900" : ""}`}>
+                className={`mt-4 w-full rounded-full ${!it.connected ? "bg-neutral-900 dark:bg-white dark:text-neutral-900" : ""}`}>
                 {it.connected ? "Disconnect" : "Connect"}
               </Button>
             </motion.div>

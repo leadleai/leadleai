@@ -10,7 +10,7 @@ import { MailOpen, MessageSquare, CalendarClock, TrendingUp } from "lucide-react
 import { analyticsSeries, revenueSeries, industrySplit } from "@/lib/mockData";
 import { toast } from "sonner";
 
-const COLORS = ["#6366f1", "#a855f7", "#0ea5e9", "#10b981"];
+const COLORS = ["#ffffff", "#a3a3a3", "#d4d4d4", "#737373"];
 
 export default function Analytics() {
   return (
@@ -31,27 +31,27 @@ export default function Analytics() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+        <div className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
           <h3 className="font-heading font-semibold text-lg mb-4">Revenue trend (in $k)</h3>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={revenueSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
               <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }} />
-              <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
+              <Line type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
           <h3 className="font-heading font-semibold text-lg mb-4">Top industries</h3>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={industrySplit} innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
                 {industrySplit.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-1.5 mt-2">
@@ -63,22 +63,22 @@ export default function Analytics() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
           <h3 className="font-heading font-semibold text-lg mb-4">Weekly engagement</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={analyticsSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
               <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
               <Legend />
-              <Bar dataKey="open" fill="#6366f1" radius={[6,6,0,0]} />
-              <Bar dataKey="reply" fill="#a855f7" radius={[6,6,0,0]} />
-              <Bar dataKey="meetings" fill="#10b981" radius={[6,6,0,0]} />
+              <Bar dataKey="open" fill="#ffffff" radius={[6,6,0,0]} />
+              <Bar dataKey="reply" fill="#a3a3a3" radius={[6,6,0,0]} />
+              <Bar dataKey="meetings" fill="#737373" radius={[6,6,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
           <h3 className="font-heading font-semibold text-lg mb-4">Best performing</h3>
           <div className="space-y-4">
             {[
@@ -87,9 +87,9 @@ export default function Analytics() {
               { label: "Best sales script", value: "Series B Congrats Opener", meta: "38% connect rate" },
               { label: "Best time to send", value: "Tuesday 10 AM PST", meta: "+22% engagement" },
             ].map((r) => (
-              <div key={r.label} className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 last:border-0">
-                <div><p className="text-xs text-slate-400">{r.label}</p><p className="font-medium text-sm">{r.value}</p></div>
-                <span className="text-sm text-emerald-500 font-medium shrink-0 ml-3">{r.meta}</span>
+              <div key={r.label} className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3 last:border-0">
+                <div><p className="text-xs text-neutral-400">{r.label}</p><p className="font-medium text-sm">{r.value}</p></div>
+                <span className="text-sm text-neutral-500 font-medium shrink-0 ml-3">{r.meta}</span>
               </div>
             ))}
           </div>

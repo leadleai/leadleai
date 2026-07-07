@@ -22,17 +22,17 @@ export default function Automation() {
         action={
           <div className="flex items-center gap-2">
             <Button data-testid="templates-btn" variant="outline" className="rounded-full" onClick={() => toast.info("Template gallery opened")}><LayoutTemplate className="w-4 h-4 mr-1" /> Templates</Button>
-            <Button data-testid="run-workflow-btn" onClick={() => toast.success("Workflow activated")} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600"><Play className="w-4 h-4 mr-1" /> Activate</Button>
+            <Button data-testid="run-workflow-btn" onClick={() => toast.success("Workflow activated")} className="rounded-full bg-white text-black"><Play className="w-4 h-4 mr-1" /> Activate</Button>
           </div>
         } />
 
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 h-12 border-b border-slate-200 dark:border-slate-800">
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 h-12 border-b border-neutral-200 dark:border-neutral-800">
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="zoom-in" onClick={() => setZoom(z => Math.min(1.4, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="zoom-out" onClick={() => setZoom(z => Math.max(0.6, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="undo" onClick={() => toast.info("Undo")}><Undo2 className="w-4 h-4" /></Button>
-          <span className="text-xs text-slate-400 ml-2">{Math.round(zoom * 100)}%</span>
-          <Button size="sm" variant="ghost" className="rounded-lg ml-auto text-indigo-600" data-testid="add-node" onClick={() => toast.success("Node added")}><Plus className="w-4 h-4 mr-1" /> Add Node</Button>
+          <span className="text-xs text-neutral-400 ml-2">{Math.round(zoom * 100)}%</span>
+          <Button size="sm" variant="ghost" className="rounded-lg ml-auto text-neutral-600" data-testid="add-node" onClick={() => toast.success("Node added")}><Plus className="w-4 h-4 mr-1" /> Add Node</Button>
         </div>
 
         <div className="relative overflow-auto grain" style={{ height: 480 }} data-testid="automation-canvas">
@@ -41,17 +41,17 @@ export default function Automation() {
               {connections.map(([a, b], i) => {
                 const from = nodeById[a], to = nodeById[b];
                 const x1 = from.x + 90, y1 = from.y + 30, x2 = to.x + 90, y2 = to.y + 30;
-                return <path key={i} d={`M ${x1} ${y1} C ${x1 + 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`} stroke="#c7d2fe" strokeWidth="2" fill="none" />;
+                return <path key={i} d={`M ${x1} ${y1} C ${x1 + 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`} stroke="#404040" strokeWidth="2" fill="none" />;
               })}
             </svg>
             {automationNodes.map((n, i) => {
               const Icon = iconMap[n.icon];
               return (
                 <motion.div key={n.id} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
-                  className="absolute w-44 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-3 cursor-grab hover:border-indigo-400 hover:shadow-md transition-all"
+                  className="absolute w-44 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-sm p-3 cursor-grab hover:border-neutral-400 hover:shadow-md transition-all"
                   style={{ left: n.x, top: n.y }} data-testid={`automation-node-${n.id}`}>
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white shrink-0"><Icon className="w-4 h-4" /></div>
+                    <div className="w-9 h-9 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-white shrink-0"><Icon className="w-4 h-4" /></div>
                     <span className="font-medium text-sm">{n.label}</span>
                   </div>
                 </motion.div>

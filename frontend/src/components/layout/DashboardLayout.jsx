@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, Microscope, Megaphone, Mail, Phone, CalendarClock,
   Kanban, BarChart3, Workflow, BookOpen, Plug, Settings as SettingsIcon,
-  Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Zap
+  Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Plus
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
@@ -42,9 +42,7 @@ function SidebarContent({ onNavigate }) {
   return (
     <div className="flex h-full flex-col">
       <Link to="/app" className="flex items-center gap-2.5 px-5 h-16 shrink-0" data-testid="sidebar-logo">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-          <Zap className="w-5 h-5 text-white" fill="white" />
-        </div>
+        <Plus className="w-6 h-6 text-foreground" strokeWidth={3} />
         <span className="font-heading font-bold text-lg tracking-tight">LeadPilot</span>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
@@ -58,8 +56,8 @@ function SidebarContent({ onNavigate }) {
               data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
               className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                 active
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                  : "text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
               }`}
             >
               <item.icon className="w-[18px] h-[18px]" />
@@ -69,10 +67,10 @@ function SidebarContent({ onNavigate }) {
         })}
       </nav>
       <div className="p-3">
-        <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 p-4 text-white">
+        <div className="rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4">
           <p className="font-heading font-semibold text-sm">Upgrade to Growth</p>
-          <p className="text-xs text-white/80 mt-1">Unlock unlimited AI leads & calls.</p>
-          <Button data-testid="sidebar-upgrade-btn" onClick={() => toast.success("Upgrade flow started")} className="mt-3 w-full h-8 rounded-lg bg-white text-indigo-700 hover:bg-white/90 text-xs">Upgrade</Button>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Unlock unlimited AI leads & calls.</p>
+          <Button data-testid="sidebar-upgrade-btn" onClick={() => toast.success("Upgrade flow started")} className="mt-3 w-full h-8 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90 text-xs">Upgrade</Button>
         </div>
       </div>
     </div>
@@ -102,7 +100,7 @@ function AIAssistant() {
         data-testid="ai-assistant-fab"
         onClick={() => setOpen(true)}
         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white"
+        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-white text-black shadow-lg shadow-black/30 flex items-center justify-center"
       >
         <Sparkles className="w-6 h-6" />
       </motion.button>
@@ -112,23 +110,23 @@ function AIAssistant() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+            className="fixed bottom-24 right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden"
             data-testid="ai-assistant-panel"
           >
-            <div className="flex items-center justify-between px-4 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+            <div className="flex items-center justify-between px-4 h-14 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-foreground">
               <div className="flex items-center gap-2"><Sparkles className="w-5 h-5" /><span className="font-heading font-semibold">AI Assistant</span></div>
               <button data-testid="ai-assistant-close" onClick={() => setOpen(false)}><X className="w-5 h-5" /></button>
             </div>
             <div className="h-72 overflow-y-auto p-4 space-y-3">
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"}`}>{m.text}</div>
+                  <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200"}`}>{m.text}</div>
                 </div>
               ))}
             </div>
-            <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+            <div className="p-3 border-t border-neutral-200 dark:border-neutral-800 flex gap-2">
               <Input data-testid="ai-assistant-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask anything..." className="rounded-xl" />
-              <Button data-testid="ai-assistant-send" onClick={send} size="icon" className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 shrink-0"><Send className="w-4 h-4" /></Button>
+              <Button data-testid="ai-assistant-send" onClick={send} size="icon" className="rounded-xl bg-white text-black hover:bg-neutral-200 shrink-0"><Send className="w-4 h-4" /></Button>
             </div>
           </motion.div>
         )}
@@ -143,15 +141,15 @@ export default function DashboardLayout() {
   const [cmdOpen, setCmdOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-100">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 selection:bg-neutral-100">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-30">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-30">
         <SidebarContent />
       </aside>
 
       <div className="lg:pl-64">
         {/* Top navbar */}
-        <header className="sticky top-0 z-20 h-16 glass border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 px-4 sm:px-6">
+        <header className="sticky top-0 z-20 h-16 glass border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-3 px-4 sm:px-6">
           {/* Mobile menu */}
           <Sheet>
             <SheetTrigger asChild>
@@ -166,10 +164,10 @@ export default function DashboardLayout() {
           <button
             data-testid="global-search-trigger"
             onClick={() => setCmdOpen(true)}
-            className="flex items-center gap-2 flex-1 max-w-md h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 text-sm text-slate-400"
+            className="flex items-center gap-2 flex-1 max-w-md h-10 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3.5 text-sm text-neutral-400"
           >
             <Search className="w-4 h-4" /> Search leads, companies, meetings...
-            <span className="ml-auto hidden sm:flex items-center gap-1 text-xs text-slate-400"><Command className="w-3 h-3" />K</span>
+            <span className="ml-auto hidden sm:flex items-center gap-1 text-xs text-neutral-400"><Command className="w-3 h-3" />K</span>
           </button>
 
           <div className="ml-auto flex items-center gap-1.5">
@@ -181,7 +179,7 @@ export default function DashboardLayout() {
               <DropdownMenuTrigger asChild>
                 <Button data-testid="notifications-btn" variant="ghost" size="icon" className="rounded-xl relative">
                   <Bell className="w-5 h-5" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-600" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-neutral-600" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
@@ -190,27 +188,27 @@ export default function DashboardLayout() {
                 {notifications.map((n) => (
                   <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-2.5" data-testid={`notification-${n.id}`}>
                     <span className="text-sm">{n.text}</span>
-                    <span className="text-xs text-slate-400">{n.time}</span>
+                    <span className="text-xs text-neutral-400">{n.time}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
             <Button data-testid="assistant-nav-btn" variant="ghost" size="icon" className="rounded-xl hidden sm:flex" onClick={() => toast.info("AI Assistant is bottom-right ✨")}>
-              <Sparkles className="w-5 h-5 text-indigo-600" />
+              <Sparkles className="w-5 h-5 text-neutral-600" />
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button data-testid="profile-menu-btn" className="flex items-center gap-2 rounded-xl pl-1 pr-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <Avatar className="w-8 h-8"><AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white text-xs">AJ</AvatarFallback></Avatar>
-                  <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
+                <button data-testid="profile-menu-btn" className="flex items-center gap-2 rounded-xl pl-1 pr-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                  <Avatar className="w-8 h-8"><AvatarFallback className="bg-neutral-900 dark:bg-white text-white dark:text-black text-xs">AJ</AvatarFallback></Avatar>
+                  <ChevronDown className="w-4 h-4 text-neutral-400 hidden sm:block" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="font-semibold">Alex Johnson</div>
-                  <div className="text-xs font-normal text-slate-400">alex@vertexlabs.io</div>
+                  <div className="text-xs font-normal text-neutral-400">alex@vertexlabs.io</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/app/settings")} data-testid="profile-settings">Settings</DropdownMenuItem>

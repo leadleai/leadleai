@@ -28,19 +28,19 @@ export default function ForgotPassword() {
     <AuthShell title={sent ? "Check your email" : "Reset your password"} subtitle={sent ? "We've sent a password reset link to your inbox." : "Enter your email and we'll send you a reset link."}>
       {sent ? (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6" data-testid="reset-sent">
-          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 mx-auto">
-            <MailCheck className="w-8 h-8 text-emerald-500" />
+          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-neutral-50 dark:bg-neutral-500/10 mx-auto">
+            <MailCheck className="w-8 h-8 text-neutral-500" />
           </div>
-          <p className="text-center text-sm text-slate-500">Didn&apos;t receive it? Check spam or <button onClick={() => setSent(false)} className="text-indigo-600 hover:underline">try again</button>.</p>
+          <p className="text-center text-sm text-neutral-500">Didn&apos;t receive it? Check spam or <button onClick={() => setSent(false)} className="text-neutral-600 hover:underline">try again</button>.</p>
           <Link to="/login"><Button data-testid="back-to-login" variant="outline" className="w-full h-11 rounded-full">Back to login</Button></Link>
         </motion.div>
       ) : (
         <form onSubmit={submit} className="space-y-4" data-testid="forgot-form" noValidate>
-          <div className="space-y-1.5"><Label>Email</Label><Input data-testid="forgot-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className={`rounded-xl h-11 ${error ? "border-rose-400" : ""}`} />{error && <p className="text-xs text-rose-500" data-testid="forgot-email-error">{error}</p>}</div>
-          <Button data-testid="forgot-submit" type="submit" disabled={loading} className="w-full h-11 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg">
+          <div className="space-y-1.5"><Label>Email</Label><Input data-testid="forgot-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className={`rounded-xl h-11 ${error ? "border-neutral-400" : ""}`} />{error && <p className="text-xs text-neutral-500" data-testid="forgot-email-error">{error}</p>}</div>
+          <Button data-testid="forgot-submit" type="submit" disabled={loading} className="w-full h-11 rounded-full bg-white text-black hover:shadow-lg">
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</> : "Send reset link"}
           </Button>
-          <p className="text-center text-sm text-slate-500 mt-4"><Link to="/login" className="text-indigo-600 font-medium hover:underline">← Back to login</Link></p>
+          <p className="text-center text-sm text-neutral-500 mt-4"><Link to="/login" className="text-neutral-600 font-medium hover:underline">← Back to login</Link></p>
         </form>
       )}
     </AuthShell>
