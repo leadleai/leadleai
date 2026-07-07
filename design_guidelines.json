@@ -1,0 +1,138 @@
+{
+  "theme": "Light",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) merged with soft touches of Archetype 3 for a premium, clean, modern AI SaaS feel",
+  "typography": {
+    "fonts": {
+      "heading": "Outfit, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl tracking-tight font-semibold text-slate-900",
+      "h2": "text-3xl sm:text-4xl tracking-tight font-semibold text-slate-900",
+      "h3": "text-xl sm:text-2xl font-medium text-slate-900",
+      "h4": "text-lg sm:text-xl font-medium text-slate-900",
+      "body": "text-base text-slate-600 leading-relaxed",
+      "small": "text-sm text-slate-500",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-indigo-600"
+    }
+  },
+  "colors": {
+    "background": {
+      "default": "#FAFAFA",
+      "gradient_subtle": "bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50"
+    },
+    "surface": {
+      "card": "#FFFFFF",
+      "sidebar": "#FFFFFF",
+      "glass": "bg-white/70 backdrop-blur-xl border border-white/20",
+      "elevated": "#FFFFFF"
+    },
+    "primary": {
+      "default": "#0F172A",
+      "hover": "#1E293B",
+      "gradient": "bg-gradient-to-r from-indigo-600 to-purple-600"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "tertiary": "#94A3B8",
+      "inverse": "#FFFFFF"
+    },
+    "border": {
+      "default": "#E2E8F0",
+      "subtle": "#F1F5F9"
+    }
+  },
+  "layout": {
+    "spacing_scale": "Generous. Use p-6, p-8, p-12 for containers.",
+    "border_radius": {
+      "card": "rounded-2xl",
+      "button": "rounded-full",
+      "input": "rounded-xl",
+      "badge": "rounded-full"
+    },
+    "shadows": {
+      "sm": "shadow-[0_2px_8px_rgba(15,23,42,0.04)]",
+      "md": "shadow-[0_8px_24px_rgba(15,23,42,0.06)]",
+      "lg": "shadow-[0_16px_48px_rgba(15,23,42,0.08)]",
+      "glass": "shadow-[0_8px_32px_rgba(15,23,42,0.04)]"
+    },
+    "grids": {
+      "marketing": "grid-cols-1 md:grid-cols-12 gap-8",
+      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "bento": "grid-cols-1 md:grid-cols-3 gap-6"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "rounded-full bg-slate-900 text-white hover:bg-slate-800 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2",
+      "gradient": "rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2",
+      "secondary": "rounded-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 transition-all font-medium px-6 py-2.5 inline-flex items-center justify-center gap-2"
+    },
+    "cards": {
+      "default": "bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8",
+      "glass": "bg-white/70 backdrop-blur-xl border border-white/40 rounded-2xl shadow-glass p-6 sm:p-8"
+    },
+    "inputs": {
+      "default": "bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900"
+    }
+  },
+  "interactions": {
+    "hover": "Subtle lifts (-translate-y-1) for cards, background color shifts for buttons",
+    "animation": "Use framer-motion for page transitions, staggered list items, and smooth layout changes",
+    "loaders": "Skeleton loaders matching rounded-2xl/rounded-xl shapes with a subtle pulse animation"
+  },
+  "media": {
+    "hero_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1614851099511-773084f6911d",
+        "category": "hero_bg",
+        "description": "Abstract subtle light illustration to be used at low opacity (10-20%) behind the glassmorphism hero for an AI vibe."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1604079628040-94301bb21b91",
+        "category": "hero_bg",
+        "description": "Bright, soft background to mix for gradient vibes."
+      }
+    ],
+    "avatars": [
+      {
+        "url": "https://images.pexels.com/photos/12931653/pexels-photo-12931653.jpeg",
+        "category": "testimonial_avatar",
+        "description": "Professional woman headshot for testimonials/team."
+      },
+      {
+        "url": "https://images.pexels.com/photos/10816007/pexels-photo-10816007.jpeg",
+        "category": "testimonial_avatar",
+        "description": "Professional man headshot for testimonials/team."
+      }
+    ],
+    "logos": [
+      {
+        "url": "https://images.pexels.com/photos/21898300/pexels-photo-21898300.jpeg",
+        "category": "integration_logo",
+        "description": "Use as a placeholder for integration cards if lucide icons are not sufficient."
+      },
+      {
+        "url": "https://images.pexels.com/photos/9683980/pexels-photo-9683980.jpeg",
+        "category": "company_banner",
+        "description": "Microsoft building image (can be used as a company banner/background in the CRM research panel)."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure global layout uses 'min-h-screen bg-slate-50 selection:bg-indigo-100 text-slate-900'.",
+    "Import Outfit font for headings and Inter for body text via Google Fonts in index.css.",
+    "Use lucide-react for all standard icons, sizing them appropriately (w-5 h-5 for inline, larger for empty states).",
+    "For the marketing page, use a glassmorphism sticky header: 'fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md border-b border-slate-200/50'.",
+    "The Dashboard must have a sidebar ('w-64 border-r border-slate-200 bg-white') and a top navbar for search/profile.",
+    "Use realistic mock data for leads, emails, and CRM. Avoid generic 'Test 1', 'Test 2'. Use names like 'Acme Corp', 'Sarah Jenkins', etc.",
+    "Ensure all interactive elements have a data-testid attribute for testing (e.g. data-testid='login-submit-button').",
+    "Include a functional Dark Mode toggle (using standard Tailwind 'dark:' variants). Ensure light theme is the absolute default and meticulously styled.",
+    "For the CRM Kanban, visually represent columns as rounded-2xl slate-50/100 containers with white rounded-xl cards inside.",
+    "For empty states, use a light grey icon and a gentle prompt text.",
+    "Implement the landing page hero with an animated workflow pipeline (using framer-motion to show Find Leads -> Research -> Email -> Call -> Book Meeting).",
+    "Build out all requested pages: Landing, Auth, Onboarding, Dashboard, Lead Discovery, Research, Email Studio, Phone Agent, Scheduler, CRM, Analytics, Automations, Knowledge Base, Integrations, Settings."
+  ]
+}
