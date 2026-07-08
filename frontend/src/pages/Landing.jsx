@@ -29,7 +29,7 @@ export default function Landing() {
   }, [location.state]);
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black">
+    <div className="dark min-h-screen bg-black text-white selection:bg-white selection:text-black">
       <MarketingNav />
 
       {/* Hero */}
@@ -40,8 +40,8 @@ export default function Landing() {
           {/* Left */}
           <div>
             <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-              className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[0.95]">
-              Your AI Sales Team<br />That Never Sleeps.
+              className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02]">
+              Your AI Sales Team<br />That <span className="font-display-italic font-normal">Never Sleeps.</span>
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
               className="mt-6 text-lg text-neutral-400 font-light max-w-md leading-relaxed">
@@ -85,8 +85,8 @@ export default function Landing() {
       {/* Workflow */}
       <section id="workflow" className="py-24 scroll-mt-20 border-t border-neutral-900">
         <div className="max-w-6xl mx-auto px-6 sm:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-neutral-500 text-center">The Autonomous Workflow</p>
-          <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight text-center mt-3">One AI employee.<br />The entire sales cycle.</h2>
+          <p className="kicker text-neutral-500 text-center">The Autonomous Workflow</p>
+          <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight text-center mt-3">One AI employee.<br />The entire sales cycle.</h2>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-14">
             {workflowSteps.map((step, i) => {
               const Icon = iconMap[step.icon] || Brain;
@@ -112,8 +112,8 @@ export default function Landing() {
       <section id="features" className="py-24 scroll-mt-20 border-t border-neutral-900">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-neutral-500">Capabilities</p>
-            <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight mt-3">Everything a top sales rep does — automated.</h2>
+            <p className="kicker text-neutral-500">Capabilities</p>
+            <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight mt-3">Everything a top sales rep does — automated.</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-neutral-900 border border-neutral-900 rounded-2xl overflow-hidden mt-14">
             {features.map((f, i) => {
@@ -136,8 +136,8 @@ export default function Landing() {
       {/* Testimonials */}
       <section className="py-24 border-t border-neutral-900">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-neutral-500 text-center">Loved by revenue teams</p>
-          <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight text-center mt-3">Pipeline on autopilot.</h2>
+          <p className="kicker text-neutral-500 text-center">Loved by revenue teams</p>
+          <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight text-center mt-3">Pipeline on autopilot.</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14">
             {testimonials.map((t, i) => (
               <motion.div key={t.name} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
@@ -158,8 +158,8 @@ export default function Landing() {
       <section id="pricing" className="py-24 scroll-mt-20 border-t border-neutral-900">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="text-center max-w-2xl mx-auto">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-neutral-500">Pricing</p>
-            <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight mt-3">Simple, scalable pricing.</h2>
+            <p className="kicker text-neutral-500">Pricing</p>
+            <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight mt-3">Simple, scalable pricing.</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 max-w-5xl mx-auto">
             {pricing.map((p, i) => (
@@ -189,8 +189,8 @@ export default function Landing() {
       <section id="faq" className="py-24 scroll-mt-20 border-t border-neutral-900">
         <div className="max-w-3xl mx-auto px-6 sm:px-8">
           <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-neutral-500">FAQ</p>
-            <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight mt-3">Frequently asked questions.</h2>
+            <p className="kicker text-neutral-500">FAQ</p>
+            <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight mt-3">Frequently asked questions.</h2>
           </div>
           <Accordion type="single" collapsible className="mt-10" data-testid="faq-accordion">
             {faqs.map((f, i) => (
@@ -209,7 +209,7 @@ export default function Landing() {
           <div className="relative overflow-hidden rounded-3xl bg-white text-black p-10 sm:p-16 text-center">
             <div className="absolute inset-0 grain-light opacity-60" />
             <div className="relative">
-              <h2 className="font-heading text-3xl sm:text-5xl font-bold tracking-tight">Hire your AI sales employee today.</h2>
+              <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight">Hire your AI sales employee today.</h2>
               <p className="text-neutral-600 mt-4 max-w-xl mx-auto font-light">Join thousands of teams filling their pipeline on autopilot. Live in under 15 minutes.</p>
               <Button data-testid="cta-final-btn" onClick={() => navigate("/signup")} size="lg" className="mt-8 rounded-full bg-black text-white hover:bg-neutral-800 px-8 h-12 text-base">
                 Start Free Trial <ArrowUpRight className="w-4 h-4 ml-1" />

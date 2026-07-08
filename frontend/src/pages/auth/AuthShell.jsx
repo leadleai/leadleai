@@ -6,7 +6,7 @@ const AUTH_IMG = "https://images.unsplash.com/photo-1518611540400-6b85a0704342?c
 
 export default function AuthShell({ children, title, subtitle }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-white dark:bg-black text-neutral-900 dark:text-white">
+    <div className="dark min-h-screen grid lg:grid-cols-2 bg-black text-white">
       {/* Left brand panel — B&W cinematic */}
       <div className="hidden lg:flex relative flex-col justify-between p-12 overflow-hidden bg-black text-white">
         <img src={AUTH_IMG} alt="" className="absolute inset-0 w-full h-full object-cover grayscale contrast-125 opacity-60" />
@@ -16,7 +16,7 @@ export default function AuthShell({ children, title, subtitle }) {
           <span className="font-heading font-bold text-lg">LeadPilot AI</span>
         </Link>
         <div className="relative">
-          <h2 className="font-heading text-4xl font-extrabold tracking-tighter leading-[0.95]">Your AI sales team that never sleeps.</h2>
+          <h2 className="font-display text-4xl font-semibold tracking-tight leading-[0.95]">Your AI sales team that never sleeps.</h2>
           <p className="text-neutral-400 mt-4 max-w-md font-light">Finds leads, researches accounts, writes outreach, makes calls, and books meetings — autonomously.</p>
           <div className="flex items-center gap-3 mt-8">
             <div className="flex -space-x-2">{[1,2,3,4].map(i => <div key={i} className="w-9 h-9 rounded-full bg-white/10 border-2 border-black backdrop-blur" />)}</div>
@@ -33,7 +33,7 @@ export default function AuthShell({ children, title, subtitle }) {
             <Plus className="w-7 h-7 text-foreground" strokeWidth={3} />
             <span className="font-heading font-bold text-lg">LeadPilot AI</span>
           </Link>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tighter">{title}</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">{title}</h1>
           <p className="text-neutral-500 dark:text-neutral-400 mt-1 text-sm font-light">{subtitle}</p>
           <div className="mt-8">{children}</div>
         </motion.div>
