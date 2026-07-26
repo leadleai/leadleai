@@ -116,19 +116,23 @@ export const industrySplit = [
   { name: "Healthcare", value: 21 }, { name: "Retail", value: 19 },
 ];
 
+// `type` drives the connect flow: "oauth" opens the app to authorize,
+// "apikey" asks for a secret key, "webhook" asks for an endpoint URL.
+// `authUrl` is the real sign-in / authorize / docs page opened in a new tab.
 export const integrations = [
-  { name: "Google Workspace", desc: "Email, Calendar & Contacts sync", connected: true, icon: "Chrome" },
-  { name: "Microsoft 365", desc: "Outlook & Teams integration", connected: true, icon: "Building2" },
-  { name: "Slack", desc: "Real-time deal notifications", connected: true, icon: "Slack" },
-  { name: "HubSpot", desc: "Two-way CRM sync", connected: false, icon: "Magnet" },
-  { name: "Salesforce", desc: "Enterprise CRM sync", connected: true, icon: "Cloud" },
-  { name: "Pipedrive", desc: "Pipeline synchronization", connected: false, icon: "GitBranch" },
-  { name: "Zoho", desc: "CRM & workflows", connected: false, icon: "Circle" },
-  { name: "Twilio", desc: "AI phone calls & SMS", connected: true, icon: "Phone" },
-  { name: "OpenAI", desc: "GPT models for generation", connected: true, icon: "Sparkles" },
-  { name: "Anthropic", desc: "Claude models", connected: false, icon: "Brain" },
-  { name: "LinkedIn", desc: "Prospecting & enrichment", connected: true, icon: "Linkedin" },
-  { name: "Webhook", desc: "Custom event delivery", connected: false, icon: "Webhook" },
+  { name: "Google Workspace", desc: "Email, Calendar & Contacts sync", connected: true, icon: "Chrome", type: "oauth", authUrl: "https://accounts.google.com/", scopes: "Gmail, Calendar, Contacts" },
+  { name: "Microsoft 365", desc: "Outlook & Teams integration", connected: true, icon: "Building2", type: "oauth", authUrl: "https://login.microsoftonline.com/", scopes: "Outlook, Teams, Calendar" },
+  { name: "Slack", desc: "Real-time deal notifications", connected: true, icon: "Slack", type: "oauth", authUrl: "https://slack.com/signin", scopes: "Channels, Messages" },
+  { name: "HubSpot", desc: "Two-way CRM sync", connected: false, icon: "Magnet", type: "oauth", category: "crm", authUrl: "https://app.hubspot.com/login", scopes: "Leads, Contacts, Deals" },
+  { name: "Salesforce", desc: "Enterprise CRM sync", connected: false, icon: "Cloud", type: "oauth", category: "crm", authUrl: "https://login.salesforce.com/", scopes: "Leads, Contacts, Deals" },
+  { name: "Pipedrive", desc: "Pipeline synchronization", connected: false, icon: "GitBranch", type: "oauth", category: "crm", authUrl: "https://app.pipedrive.com/auth/login", scopes: "Leads, Contacts, Deals" },
+  { name: "Zoho", desc: "CRM & workflows", connected: false, icon: "Circle", type: "oauth", category: "crm", authUrl: "https://accounts.zoho.com/signin", scopes: "Leads, Contacts, Deals" },
+  { name: "Sangam CRM", desc: "Leads, contacts & deals sync", connected: false, icon: "Database", type: "oauth", category: "crm", authUrl: "https://app.sangamcrm.com/login", scopes: "Leads, Contacts, Deals" },
+  { name: "Twilio", desc: "AI phone calls & SMS", connected: true, icon: "Phone", type: "apikey", authUrl: "https://console.twilio.com/", keyLabel: "Auth Token", keyHint: "Find it in Console → Account Info" },
+  { name: "OpenAI", desc: "GPT models for generation", connected: true, icon: "Sparkles", type: "apikey", authUrl: "https://platform.openai.com/api-keys", keyLabel: "API Key", keyHint: "Starts with sk-…" },
+  { name: "Anthropic", desc: "Claude models", connected: false, icon: "Brain", type: "apikey", authUrl: "https://console.anthropic.com/settings/keys", keyLabel: "API Key", keyHint: "Starts with sk-ant-…" },
+  { name: "LinkedIn", desc: "Prospecting & enrichment", connected: true, icon: "Linkedin", type: "oauth", authUrl: "https://www.linkedin.com/login", scopes: "Profile, Connections" },
+  { name: "Webhook", desc: "Custom event delivery", connected: false, icon: "Webhook", type: "webhook", authUrl: "https://webhook.site/", keyLabel: "Endpoint URL", keyHint: "We POST events as JSON to this URL" },
 ];
 
 export const knowledgeDocs = [

@@ -1,100 +1,203 @@
+import { useState } from "react";
 import {
-  ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend
+  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
-import { Download } from "lucide-react";
-import { PageHeader, StatCard } from "@/components/shared/Primitives";
+import { Download, Users, Phone, Mail, CalendarClock, Loader2, AlertTriangle, BarChart3 } from "lucide-react";
+import { PageHeader, StatCard, EmptyState } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MailOpen, MessageSquare, CalendarClock, TrendingUp } from "lucide-react";
-import { analyticsSeries, revenueSeries, industrySplit } from "@/lib/mockData";
+import PeriodFilter from "@/components/app/PeriodFilter";
+import { ANALYTICS_PERIODS } from "@/lib/backend";
+import { useAnalytics, shortDay } from "@/lib/useAnalytics";
 import { toast } from "sonner";
 
-const COLORS = ["#ffffff", "#a3a3a3", "#d4d4d4", "#737373"];
+// Monochrome palette (works in light + dark) for the status pie.
+const STATUS_ORDER = ["new", "contacted", "interested", "meeting_booked", "closed"];
+const STATUS_LABELS = {
+  new: "New", contacted: "Contacted", interested: "Interested",
+  meeting_booked: "Meeting booked", closed: "Closed",
+};
+const PIE_COLORS = ["#525252", "#737373", "#a3a3a3", "#404040", "#d4d4d4"];
+const TOOLTIP = { borderRadius: 12, border: "1px solid #8888883f", background: "rgba(23,23,23,0.92)", color: "#fff" };
+const GRID = "#8888881f";
 
 export default function Analytics() {
+  const [period, setPeriod] = useState("7d");
+  const { summary, timeseries, state, error, hasData, reload } = useAnalytics(period);
+
+  const exportCsv = () => {
+    if (!timeseries?.points?.length) return;
+    const header = ["day", "leads", "calls_placed", "calls_failed", "emails_sent", "emails_failed"];
+    const rows = timeseries.points.map((p) => header.map((k) => p[k]).join(","));
+    const csv = [header.join(","), ...rows].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${period}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Exported to CSV");
+  };
+
+  const periodLabel = ANALYTICS_PERIODS.find((p) => p.value === period)?.label || "";
+
   return (
     <div>
-      <PageHeader title="Analytics" subtitle="Performance across your entire sales motion" testid="analytics-header"
+      <PageHeader
+        title="Analytics"
+        subtitle={`Real performance across your leads, calls and emails · ${periodLabel}`}
+        testid="analytics-header"
         action={
           <div className="flex items-center gap-2">
-            <Tabs defaultValue="weekly"><TabsList className="rounded-full"><TabsTrigger value="daily" className="rounded-full">Daily</TabsTrigger><TabsTrigger value="weekly" className="rounded-full">Weekly</TabsTrigger><TabsTrigger value="monthly" className="rounded-full">Monthly</TabsTrigger></TabsList></Tabs>
-            <Button data-testid="export-btn" variant="outline" className="rounded-full" onClick={() => toast.success("Report exported to CSV")}><Download className="w-4 h-4 mr-1" /> Export</Button>
+            <PeriodFilter value={period} onChange={setPeriod} />
+            <Button data-testid="export-btn" variant="outline" className="rounded-full"
+              onClick={exportCsv} disabled={!hasData}>
+              <Download className="w-4 h-4 mr-1" /> Export
+            </Button>
           </div>
-        } />
+        }
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Open Rate" value="61%" delta="+4%" icon={MailOpen} accent="indigo" index={0} />
-        <StatCard label="Reply Rate" value="14.2%" delta="+2.1%" icon={MessageSquare} accent="purple" index={1} />
-        <StatCard label="Meeting Rate" value="6.8%" delta="+1.2%" icon={CalendarClock} accent="sky" index={2} />
-        <StatCard label="Conversion" value="3.1%" delta="+0.4%" icon={TrendingUp} accent="emerald" index={3} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-heading font-semibold text-lg mb-4">Revenue trend (in $k)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={revenueSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
-              <Line type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
+      {state === "loading" && (
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 flex items-center justify-center gap-2 text-sm text-neutral-500">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading analytics…
         </div>
+      )}
 
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-heading font-semibold text-lg mb-4">Top industries</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={industrySplit} innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                {industrySplit.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5 mt-2">
-            {industrySplit.map((s, i) => (
-              <div key={s.name} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i] }} />{s.name}</span><span className="font-medium">{s.value}%</span></div>
-            ))}
+      {state === "error" && (
+        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="analytics-error">
+          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+            <AlertTriangle className="w-4 h-4" /> Couldn’t load analytics
           </div>
+          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <button onClick={reload} className="mt-4 text-sm font-medium underline underline-offset-2">Try again</button>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-heading font-semibold text-lg mb-4">Weekly engagement</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={analyticsSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #262626" }} />
-              <Legend />
-              <Bar dataKey="open" fill="#ffffff" radius={[6,6,0,0]} />
-              <Bar dataKey="reply" fill="#a3a3a3" radius={[6,6,0,0]} />
-              <Bar dataKey="meetings" fill="#737373" radius={[6,6,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {state === "ready" && !hasData && (
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+          <EmptyState icon={BarChart3} title="No data yet for this period"
+            desc="There's no lead, call or email activity in this window yet. Pick a longer period, or check back once your pipeline is active." />
         </div>
+      )}
 
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-heading font-semibold text-lg mb-4">Best performing</h3>
-          <div className="space-y-4">
-            {[
-              { label: "Best campaign", value: "Fintech Founders", meta: "19% reply rate" },
-              { label: "Best subject line", value: "A 60% faster ramp for {{company}}", meta: "64% open rate" },
-              { label: "Best sales script", value: "Series B Congrats Opener", meta: "38% connect rate" },
-              { label: "Best time to send", value: "Tuesday 10 AM PST", meta: "+22% engagement" },
-            ].map((r) => (
-              <div key={r.label} className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3 last:border-0">
-                <div><p className="text-xs text-neutral-400">{r.label}</p><p className="font-medium text-sm">{r.value}</p></div>
-                <span className="text-sm text-neutral-500 font-medium shrink-0 ml-3">{r.meta}</span>
-              </div>
-            ))}
+      {state === "ready" && hasData && summary && timeseries && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard label="New leads" value={summary.leads_new.toLocaleString()} icon={Users} index={0} />
+            <StatCard label="Calls placed" value={summary.calls_placed.toLocaleString()} icon={Phone} index={1} />
+            <StatCard label="Emails sent" value={summary.emails_sent.toLocaleString()} icon={Mail} index={2} />
+            <StatCard label="Meetings booked" value={summary.meetings_booked.toLocaleString()} icon={CalendarClock} index={3} />
           </div>
-        </div>
-      </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <ChartCard className="lg:col-span-2" title="New leads over time">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={withLabels(timeseries)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
+                  <YAxis allowDecimals={false} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={28} />
+                  <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
+                  <Bar dataKey="leads" name="Leads" fill="#737373" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Lead status distribution">
+              <StatusPie breakdown={summary.status_breakdown} total={summary.leads_new} />
+            </ChartCard>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <ChartCard title="Calls: placed vs failed">
+              <TwoSeriesBars data={withLabels(timeseries)}
+                a={{ key: "calls_placed", name: "Placed", fill: "#525252" }}
+                b={{ key: "calls_failed", name: "Failed", fill: "#a3a3a3" }} />
+              <Totals items={[["Placed", summary.calls_placed], ["Failed", summary.calls_failed]]} />
+            </ChartCard>
+
+            <ChartCard title="Emails: sent vs failed">
+              <TwoSeriesBars data={withLabels(timeseries)}
+                a={{ key: "emails_sent", name: "Sent", fill: "#525252" }}
+                b={{ key: "emails_failed", name: "Failed", fill: "#a3a3a3" }} />
+              <Totals items={[["Sent", summary.emails_sent], ["Failed", summary.emails_failed]]} />
+            </ChartCard>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+const withLabels = (ts) => ts.points.map((p) => ({ ...p, label: shortDay(p.day) }));
+
+function ChartCard({ title, children, className = "" }) {
+  return (
+    <div className={`rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 ${className}`}>
+      <h3 className="font-heading font-semibold text-lg mb-4">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function TwoSeriesBars({ data, a, b }) {
+  return (
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+        <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
+        <YAxis allowDecimals={false} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={28} />
+        <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
+        <Legend />
+        <Bar dataKey={a.key} name={a.name} fill={a.fill} radius={[6, 6, 0, 0]} />
+        <Bar dataKey={b.key} name={b.name} fill={b.fill} radius={[6, 6, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function Totals({ items }) {
+  return (
+    <div className="flex gap-6 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+      {items.map(([label, value]) => (
+        <div key={label}>
+          <p className="text-xs text-neutral-400">{label}</p>
+          <p className="font-heading font-bold text-lg">{value.toLocaleString()}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatusPie({ breakdown, total }) {
+  const data = STATUS_ORDER
+    .map((s) => ({ name: STATUS_LABELS[s], key: s, value: breakdown?.[s] || 0 }))
+    .filter((d) => d.value > 0);
+
+  if (!total || data.length === 0) {
+    return <p className="text-sm text-neutral-500 py-8 text-center">No leads created in this period.</p>;
+  }
+  return (
+    <>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie data={data} innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+            {data.map((d, i) => <Cell key={d.key} fill={PIE_COLORS[STATUS_ORDER.indexOf(d.key) % PIE_COLORS.length]} />)}
+          </Pie>
+          <Tooltip contentStyle={TOOLTIP} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="space-y-1.5 mt-2">
+        {data.map((d) => (
+          <div key={d.key} className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[STATUS_ORDER.indexOf(d.key) % PIE_COLORS.length] }} />
+              {d.name}
+            </span>
+            <span className="font-medium">{d.value} ({Math.round((d.value / total) * 100)}%)</span>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

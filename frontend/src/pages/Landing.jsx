@@ -49,11 +49,11 @@ export default function Landing() {
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}
               className="mt-9 flex flex-col sm:flex-row gap-3">
-              <Button data-testid="hero-cta-primary" onClick={() => navigate("/signup")} size="lg"
+              <Button data-testid="hero-cta-primary" onClick={() => navigate("/enquiry")} size="lg"
                 className="rounded-full bg-white text-black hover:bg-neutral-200 px-8 h-12 text-base font-medium">
-                Start Free Trial <ArrowRight className="w-4 h-4 ml-1" />
+                Get in touch <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
-              <Button data-testid="hero-cta-secondary" onClick={() => navigate("/login")} size="lg" variant="ghost"
+              <Button data-testid="hero-cta-secondary" onClick={() => navigate("/demo")} size="lg" variant="ghost"
                 className="rounded-full px-6 h-12 text-base text-neutral-300 hover:text-white hover:bg-white/5">
                 <Play className="w-4 h-4 mr-1" /> Watch Demo
               </Button>

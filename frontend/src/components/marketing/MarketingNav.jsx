@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Menu, Plus } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
+import Logo from "@/components/shared/Logo";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -28,8 +29,10 @@ export function useSectionNav() {
 export default function MarketingNav() {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const goToSection = useSectionNav();
   const [open, setOpen] = useState(false);
+  const isHome = location.pathname === "/";
 
   const handleLink = (link) => {
     if (link.to) navigate(link.to);
@@ -41,8 +44,8 @@ export default function MarketingNav() {
     <header className="fixed top-0 w-full z-50 glass border-b border-black/10 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
-          <Plus className="w-7 h-7 text-foreground" strokeWidth={3} />
-          <span className="font-heading font-bold text-lg tracking-tight">LeadPilot AI</span>
+          <Logo className="w-7 h-7 text-foreground" />
+          <span className="font-heading font-bold text-lg tracking-tight">SaleScale AI</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -55,9 +58,12 @@ export default function MarketingNav() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button data-testid="landing-theme-toggle" variant="ghost" size="icon" onClick={toggle} className="rounded-xl">
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
+          {!isHome && (
+            <Button data-testid="landing-theme-toggle" variant="ghost" size="icon" onClick={toggle} className="rounded-xl">
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+          )}
+          <Button data-testid="nav-contact-btn" variant="outline" onClick={() => navigate("/enquiry")} className="rounded-full hidden sm:inline-flex">Get in touch</Button>
           <Button data-testid="nav-login-btn" variant="ghost" onClick={() => navigate("/login")} className="rounded-full hidden sm:inline-flex">Log in</Button>
           <Button data-testid="nav-signup-btn" onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200 dark:bg-white dark:text-black font-medium">Start Free Trial</Button>
 
@@ -76,7 +82,10 @@ export default function MarketingNav() {
                   </button>
                 ))}
                 <SheetClose asChild>
-                  <Button onClick={() => navigate("/login")} variant="outline" className="rounded-full mt-4">Log in</Button>
+                  <Button data-testid="mobile-nav-contact-btn" onClick={() => navigate("/enquiry")} variant="outline" className="rounded-full mt-4">Get in touch</Button>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Button onClick={() => navigate("/login")} variant="outline" className="rounded-full">Log in</Button>
                 </SheetClose>
                 <SheetClose asChild>
                   <Button onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200">Start Free Trial</Button>

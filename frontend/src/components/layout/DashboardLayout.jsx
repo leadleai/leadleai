@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, Users, Microscope, Megaphone, Mail, Phone, CalendarClock,
+  LayoutDashboard, Users, UsersRound, Microscope, Megaphone, Mail, Phone, CalendarClock,
   Kanban, BarChart3, Workflow, BookOpen, Plug, Settings as SettingsIcon,
-  Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Plus
+  Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Check
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
+import Logo from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -24,12 +26,11 @@ import { toast } from "sonner";
 const nav = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/app" },
   { label: "Leads", icon: Users, path: "/app/leads" },
-  { label: "Research", icon: Microscope, path: "/app/research" },
+  { label: "Team", icon: UsersRound, path: "/app/team" },
   { label: "Campaigns", icon: Megaphone, path: "/app/campaigns" },
   { label: "Emails", icon: Mail, path: "/app/emails" },
   { label: "Calls", icon: Phone, path: "/app/calls" },
   { label: "Meetings", icon: CalendarClock, path: "/app/meetings" },
-  { label: "CRM", icon: Kanban, path: "/app/crm" },
   { label: "Analytics", icon: BarChart3, path: "/app/analytics" },
   { label: "Automation", icon: Workflow, path: "/app/automation" },
   { label: "Knowledge Base", icon: BookOpen, path: "/app/knowledge" },
@@ -42,8 +43,8 @@ function SidebarContent({ onNavigate }) {
   return (
     <div className="flex h-full flex-col">
       <Link to="/app" className="flex items-center gap-2.5 px-5 h-16 shrink-0" data-testid="sidebar-logo">
-        <Plus className="w-6 h-6 text-foreground" strokeWidth={3} />
-        <span className="font-heading font-bold text-lg tracking-tight">LeadPilot</span>
+        <Logo className="w-6 h-6 text-foreground" />
+        <span className="font-heading font-bold text-lg tracking-tight">SaleScale AI</span>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {nav.map((item) => {
@@ -135,6 +136,70 @@ function AIAssistant() {
   );
 }
 
+/** Signed-in user, their org (with a switcher when they're in several), logout. */
+function UserMenu() {
+  const navigate = useNavigate();
+  const { user, org, orgs, switchOrg, signOut } = useAuth();
+
+  const email = user?.email || "";
+  const initials = (email.split("@")[0] || "?")
+    .split(/[.\-_]/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() || "")
+    .join("") || "?";
+
+  const logout = async () => {
+    await signOut();
+    toast.success("Signed out");
+    navigate("/login", { replace: true });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button data-testid="profile-menu-btn" className="flex items-center gap-2 rounded-xl pl-1 pr-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+          <Avatar className="w-8 h-8">
+            <AvatarFallback className="bg-neutral-900 dark:bg-white text-white dark:text-black text-xs">{initials}</AvatarFallback>
+          </Avatar>
+          <span className="hidden sm:block text-left leading-tight max-w-[9rem]">
+            <span className="block text-xs font-medium truncate" data-testid="header-user-email">{email}</span>
+            <span className="block text-[11px] text-neutral-400 truncate" data-testid="header-org-name">{org?.name || "…"}</span>
+          </span>
+          <ChevronDown className="w-4 h-4 text-neutral-400 hidden sm:block" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>
+          <div className="font-semibold truncate">{email || "Signed in"}</div>
+          <div className="text-xs font-normal text-neutral-400 truncate">
+            {org?.name}{org?.role ? ` · ${org.role}` : ""}
+          </div>
+        </DropdownMenuLabel>
+
+        {orgs.length > 1 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-neutral-400 font-normal">Switch workspace</DropdownMenuLabel>
+            {orgs.map((o) => (
+              <DropdownMenuItem key={o.id} onClick={() => switchOrg(o.id)} data-testid={`switch-org-${o.id}`}>
+                <span className="truncate flex-1">{o.name}</span>
+                {o.id === org?.id && <Check className="w-4 h-4 ml-2 shrink-0" />}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/app/team")} data-testid="profile-team">Team</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/app/settings")} data-testid="profile-settings">Settings</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/app/integrations")}>Integrations</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={logout} data-testid="profile-logout">Log out</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function DashboardLayout() {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
@@ -198,25 +263,7 @@ export default function DashboardLayout() {
               <Sparkles className="w-5 h-5 text-neutral-600" />
             </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button data-testid="profile-menu-btn" className="flex items-center gap-2 rounded-xl pl-1 pr-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800">
-                  <Avatar className="w-8 h-8"><AvatarFallback className="bg-neutral-900 dark:bg-white text-white dark:text-black text-xs">AJ</AvatarFallback></Avatar>
-                  <ChevronDown className="w-4 h-4 text-neutral-400 hidden sm:block" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div className="font-semibold">Alex Johnson</div>
-                  <div className="text-xs font-normal text-neutral-400">alex@vertexlabs.io</div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/app/settings")} data-testid="profile-settings">Settings</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/app/integrations")}>Integrations</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/")} data-testid="profile-logout">Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserMenu />
           </div>
         </header>
 

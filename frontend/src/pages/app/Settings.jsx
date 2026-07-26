@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { AlertTriangle, Shield, CreditCard, Check } from "lucide-react";
+import { AlertTriangle, Shield, CreditCard, Check, PhoneCall, Loader2, Clock, Mail, Sparkles } from "lucide-react";
+import { settingsApi, followupApi, aiEmailsApi } from "@/lib/backend";
 import { toast } from "sonner";
 
 const team = [
@@ -21,7 +23,7 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Manage your workspace, team, and preferences" testid="settings-header" />
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="rounded-full flex-wrap h-auto">
-          {["profile", "organization", "billing", "team", "security", "notifications"].map((t) => (
+          {["profile", "automation", "organization", "billing", "team", "security", "notifications"].map((t) => (
             <TabsTrigger key={t} value={t} data-testid={`settings-tab-${t}`} className="rounded-full capitalize">{t}</TabsTrigger>
           ))}
         </TabsList>
@@ -38,6 +40,13 @@ export default function Settings() {
               <div className="space-y-2 sm:col-span-2"><Label>Email</Label><Input defaultValue="alex@vertexlabs.io" className="rounded-xl" /></div>
             </div>
             <Button data-testid="save-profile-btn" onClick={() => toast.success("Profile saved")} className="mt-6 rounded-full bg-white text-black">Save changes</Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="automation">
+          <div className="space-y-6">
+            <AutoCallSettings />
+            <FollowupSettings />
           </div>
         </TabsContent>
 
@@ -109,6 +118,237 @@ export default function Settings() {
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Auto-calling master switch — reads/writes GET|PUT /api/settings/auto-call.
+function AutoCallSettings() {
+  const [settings, setSettings] = useState(null);
+  const [state, setState] = useState("loading"); // loading | ready | error
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setState("loading"); setError(null);
+    try { setSettings(await settingsApi.getAutoCall()); setState("ready"); }
+    catch (e) { setError(e.message); setState("error"); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (enabled) => {
+    setSaving(true);
+    try {
+      setSettings(await settingsApi.setAutoCall(enabled));
+      toast.success(enabled ? "Auto-calling enabled" : "Auto-calling disabled");
+    } catch (e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (state === "loading") {
+    return (
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading auto-call settings…
+      </div>
+    );
+  }
+  if (state === "error") {
+    return (
+      <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 max-w-2xl text-sm">
+        <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300"><AlertTriangle className="w-4 h-4" /> Couldn’t load settings</div>
+        <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+        <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
+      </div>
+    );
+  }
+
+  const q = settings.quiet_hours || {};
+  return (
+    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <PhoneCall className="w-5 h-5 text-neutral-400 mt-0.5" />
+          <div>
+            <p className="font-medium">Automatically call new leads</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md">
+              When a lead submits the enquiry form, the AI calls them after a short delay — within the allowed hours, once per lead.
+            </p>
+          </div>
+        </div>
+        <Switch data-testid="autocall-toggle" checked={!!settings.enabled} disabled={saving}
+          onCheckedChange={toggle} />
+      </div>
+
+      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
+        {settings.enabled ? "Auto-calling is ON" : "Auto-calling is OFF"}
+      </Badge>
+
+      <div className="grid sm:grid-cols-2 gap-3 text-sm">
+        <Row label="Delay before calling" value={`${settings.delay_seconds}s`} />
+        <Row label="Don’t call twice within" value={`${settings.dedupe_minutes} min`} />
+        <Row label="Allowed hours" value={`${q.start}–${q.end}`} icon={Clock} />
+        <Row label="Timezone" value={q.timezone} />
+      </div>
+
+      {!settings.bland_configured && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> BLAND_API_KEY isn’t set — auto-calls will fail until it’s configured in backend/.env.</p>
+      )}
+      {!settings.supabase_configured && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Supabase isn’t configured — leads can’t be read/updated.</p>
+      )}
+      <p className="text-xs text-neutral-400">Fine-tune the delay, hours and dedupe window via the AUTO_CALL_* variables in backend/.env. Manual calling from the Leads page always works regardless of this switch.</p>
+    </div>
+  );
+}
+
+// Follow-up email drip master switch — reads/writes GET|PUT /api/settings/followup.
+function FollowupSettings() {
+  const [settings, setSettings] = useState(null);
+  const [state, setState] = useState("loading"); // loading | ready | error
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setState("loading"); setError(null);
+    try { setSettings(await followupApi.getSettings()); setState("ready"); }
+    catch (e) { setError(e.message); setState("error"); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (enabled) => {
+    setSaving(true);
+    try {
+      setSettings(await followupApi.setSettings(enabled));
+      toast.success(enabled ? "Follow-up emails enabled" : "Follow-up emails disabled");
+    } catch (e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (state === "loading") {
+    return (
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading follow-up settings…
+      </div>
+    );
+  }
+  if (state === "error") {
+    return (
+      <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 max-w-2xl text-sm">
+        <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300"><AlertTriangle className="w-4 h-4" /> Couldn’t load follow-up settings</div>
+        <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+        <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
+      </div>
+    );
+  }
+
+  const q = settings.quiet_hours || {};
+  const schedule = (settings.schedule_hours || []).map((h) => `${h}h`).join(" → ");
+  return (
+    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Mail className="w-5 h-5 text-neutral-400 mt-0.5" />
+          <div>
+            <p className="font-medium">Automatic follow-up emails</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md">
+              Sends up to {settings.max_followups} follow-ups after an enquiry, then stops. Stops early if
+              the lead replies (status becomes interested / meeting booked / closed) or unsubscribes.
+            </p>
+          </div>
+        </div>
+        <Switch data-testid="followup-toggle" checked={!!settings.enabled} disabled={saving} onCheckedChange={toggle} />
+      </div>
+
+      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
+        {settings.enabled ? "Follow-up emails are ON" : "Follow-up emails are OFF"}
+      </Badge>
+
+      <div className="grid sm:grid-cols-2 gap-3 text-sm">
+        <Row label="Schedule after enquiry" value={schedule || "—"} />
+        <Row label="Max per lead" value={`${settings.max_followups} emails`} />
+        <Row label="Sweep runs every" value={`${settings.interval_minutes} min`} icon={Clock} />
+        <Row label="Sending window" value={`${q.start}–${q.end} ${q.timezone || ""}`} icon={Clock} />
+      </div>
+
+      {!settings.email_configured && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+          <AlertTriangle className="w-3.5 h-3.5" /> Email not configured — set RESEND_API_KEY and FOLLOWUP_FROM_EMAIL in backend/.env.
+        </p>
+      )}
+
+      <AIEmailToggle />
+
+      {settings.from_email && <p className="text-xs text-neutral-400">Sending from {settings.from_email}</p>}
+      <p className="text-xs text-neutral-400">Every email includes an unsubscribe link. When AI is off, the three templates in backend/followup.py are used.</p>
+    </div>
+  );
+}
+
+// AI-written follow-ups toggle — reads/writes GET|PUT /api/settings/ai-emails.
+// When on, follow-ups are generated to answer each lead's enquiry from the
+// Knowledge Base; otherwise the static templates are used.
+function AIEmailToggle() {
+  const [settings, setSettings] = useState(null);
+  const [state, setState] = useState("loading"); // loading | ready | error
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setState("loading");
+    try { setSettings(await aiEmailsApi.getSettings()); setState("ready"); }
+    catch { setState("error"); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (enabled) => {
+    setSaving(true);
+    try {
+      setSettings(await aiEmailsApi.setSettings(enabled));
+      toast.success(enabled ? "AI follow-ups enabled" : "AI follow-ups disabled",
+        { description: enabled ? "Emails will answer enquiries from your Knowledge Base." : "Reverting to templates." });
+    } catch (e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (state !== "ready") return null; // stay quiet if the endpoint isn't reachable
+
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-neutral-400 mt-0.5" />
+          <div>
+            <p className="font-medium">AI-written follow-ups</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md">
+              Writes each email with AI, grounded only in your{" "}
+              <a href="/app/knowledge" className="underline underline-offset-2">Knowledge Base</a>.
+              When off (default), follow-ups use rule-based keyword matching from your Knowledge Base instead.
+            </p>
+          </div>
+        </div>
+        <Switch data-testid="ai-emails-toggle" checked={!!settings.enabled}
+          disabled={saving || !settings.api_configured} onCheckedChange={toggle} />
+      </div>
+      {!settings.api_configured && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+          <AlertTriangle className="w-3.5 h-3.5" /> AI not configured — set ANTHROPIC_API_KEY in backend/.env.
+        </p>
+      )}
+      {settings.api_configured && (
+        <Badge className={`rounded-full border-0 ${settings.active
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+          : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
+          {settings.active ? `AI is ON · ${settings.model}` : "AI is OFF — using templates"}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value, icon: Icon }) {
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 px-3 py-2">
+      <p className="text-xs text-neutral-500 flex items-center gap-1">{Icon && <Icon className="w-3 h-3" />}{label}</p>
+      <p className="font-medium mt-0.5">{value}</p>
     </div>
   );
 }

@@ -1,0 +1,10 @@
+# Supabase project config (relevant bits for the OAuth integration).
+# The callback is hit by the provider's browser redirect, which has no Supabase
+# session — so JWT verification must be OFF for it. Identity is proven instead by
+# the HMAC-signed `state`. The authorize function keeps JWT verification ON.
+
+[functions.oauth-callback]
+verify_jwt = false
+
+[functions.oauth-authorize]
+verify_jwt = true

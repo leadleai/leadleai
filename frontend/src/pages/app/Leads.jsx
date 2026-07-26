@@ -1,93 +1,202 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Filter, Search, Download, Star } from "lucide-react";
+import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download } from "lucide-react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { leads } from "@/lib/mockData";
+import CallButton from "@/components/app/CallButton";
+import FollowupButton from "@/components/app/FollowupButton";
+import { leadsApi, crmApi, LEAD_STATUSES, MAX_FOLLOWUPS } from "@/lib/backend";
 import { toast } from "sonner";
 
-const statusColor = { Hot: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300", Warm: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300", Cold: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/15 dark:text-neutral-300" };
+const STATUS_META = {
+  new: { label: "New", cls: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
+  contacted: { label: "Contacted", cls: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+  interested: { label: "Interested", cls: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+  meeting_booked: { label: "Meeting booked", cls: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  closed: { label: "Closed", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+};
 
 export default function Leads() {
+  const [leads, setLeads] = useState([]);
+  const [state, setState] = useState("loading"); // loading | ready | error
+  const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
-  const [industry, setIndustry] = useState("all");
-  const [selected, setSelected] = useState([]);
+  const [crm, setCrm] = useState(null); // { provider, ready }
+  const [importing, setImporting] = useState(false);
 
-  const filtered = leads.filter((l) =>
-    (l.company.toLowerCase().includes(query.toLowerCase()) || l.contact.toLowerCase().includes(query.toLowerCase())) &&
-    (industry === "all" || l.industry === industry)
-  );
+  const load = useCallback(async () => {
+    setState("loading");
+    setError(null);
+    try {
+      const data = await leadsApi.list();
+      setLeads(Array.isArray(data) ? data : []);
+      setState("ready");
+    } catch (e) {
+      setError(e.message);
+      setState("error");
+    }
+  }, []);
 
-  const toggle = (id) => setSelected((s) => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-  const industries = [...new Set(leads.map(l => l.industry))];
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { crmApi.status().then(setCrm).catch(() => setCrm(null)); }, []);
+
+  const importFromCrm = async () => {
+    setImporting(true);
+    try {
+      const r = await crmApi.import();
+      const parts = [`Imported ${r.imported}`];
+      if (r.updated) parts.push(`updated ${r.updated}`);
+      if (r.skipped) parts.push(`skipped ${r.skipped}`);
+      const queued = r.auto_calls?.queued || 0;
+      toast.success(`${parts.join(" · ")} from ${r.provider} CRM`, {
+        description: queued ? `${queued} auto-call${queued > 1 ? "s" : ""} queued` : "No auto-calls queued",
+      });
+      await load();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const changeStatus = async (lead, status) => {
+    const prev = lead.status;
+    setLeads((ls) => ls.map((l) => (l.id === lead.id ? { ...l, status } : l))); // optimistic
+    try {
+      await leadsApi.updateStatus(lead.id, status);
+      toast.success(`${lead.name} → ${STATUS_META[status]?.label || status}`);
+    } catch (e) {
+      setLeads((ls) => ls.map((l) => (l.id === lead.id ? { ...l, status: prev } : l)));
+      toast.error(e.message);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return leads;
+    return leads.filter(
+      (l) => l.name?.toLowerCase().includes(q) || l.enquiry?.toLowerCase().includes(q),
+    );
+  }, [leads, query]);
 
   return (
     <div>
-      <PageHeader title="Lead Discovery" subtitle={`${filtered.length} prospects matching your ideal customer profile`} testid="leads-header"
-        action={<Button data-testid="generate-leads-btn" onClick={() => toast.success("Generating new leads with AI...")} className="rounded-full bg-white text-black hover:shadow-lg"><Sparkles className="w-4 h-4 mr-1" /> Generate Leads</Button>} />
-
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-        <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-neutral-200 dark:border-neutral-800">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-            <Input data-testid="leads-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search company or contact..." className="pl-9 rounded-xl" />
+      <PageHeader
+        title="Inbound Leads"
+        subtitle={state === "ready" ? `${filtered.length} of ${leads.length} leads${query ? ` matching “${query}”` : ""}` : "Enquiries from your public form"}
+        testid="leads-header"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {crm && (
+              <Badge data-testid="crm-provider-badge"
+                className={`rounded-full border-0 ${crm.ready ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"}`}>
+                CRM: {crm.provider}{crm.ready ? "" : " · not ready"}
+              </Badge>
+            )}
+            <Button data-testid="crm-import-btn" onClick={importFromCrm} disabled={importing}
+              className="rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+              {importing ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importing…</> : <><Download className="w-4 h-4 mr-1" /> Import from CRM</>}
+            </Button>
+            <Button data-testid="leads-refresh" variant="outline" className="rounded-full" onClick={load}>
+              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+            </Button>
           </div>
-          <Select value={industry} onValueChange={setIndustry}>
-            <SelectTrigger data-testid="leads-industry-filter" className="w-full sm:w-48 rounded-xl"><SelectValue placeholder="Industry" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Industries</SelectItem>
-              {industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button data-testid="leads-filter-btn" variant="outline" className="rounded-xl" onClick={() => toast.info("Advanced filters opened")}><Filter className="w-4 h-4 mr-1" /> Filters</Button>
-          <Button data-testid="leads-save-search" variant="outline" className="rounded-xl" onClick={() => toast.success("Search saved")}><Star className="w-4 h-4 mr-1" /> Save</Button>
-        </div>
+        }
+      />
 
-        {selected.length > 0 && (
-          <div className="px-4 py-2.5 bg-neutral-50 dark:bg-neutral-500/10 flex items-center gap-3 text-sm" data-testid="bulk-actions-bar">
-            <span className="font-medium">{selected.length} selected</span>
-            <Button size="sm" variant="ghost" className="h-7 rounded-lg" onClick={() => toast.success("Added to campaign")}>Add to campaign</Button>
-            <Button size="sm" variant="ghost" className="h-7 rounded-lg" onClick={() => toast.success("Emails generated")}>Generate emails</Button>
-            <Button size="sm" variant="ghost" className="h-7 rounded-lg ml-auto" onClick={() => setSelected([])}>Clear</Button>
+      {state !== "error" && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Input data-testid="leads-search" value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or enquiry…" className="pl-9 rounded-xl" />
+        </div>
+      )}
+
+      {state === "loading" && (
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 text-sm text-neutral-500">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading leads…
+        </div>
+      )}
+
+      {state === "error" && (
+        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="leads-error">
+          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+            <AlertTriangle className="w-4 h-4" /> Couldn’t load leads
           </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10"></TableHead>
-                <TableHead>Company</TableHead><TableHead>Decision Maker</TableHead><TableHead>Title</TableHead>
-                <TableHead>Industry</TableHead><TableHead>Employees</TableHead><TableHead>Revenue</TableHead>
-                <TableHead>Tech</TableHead><TableHead>Score</TableHead><TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((l) => (
-                <TableRow key={l.id} className="cursor-pointer" data-testid={`lead-row-${l.id}`}>
-                  <TableCell><Checkbox checked={selected.includes(l.id)} onCheckedChange={() => toggle(l.id)} data-testid={`lead-checkbox-${l.id}`} /></TableCell>
-                  <TableCell><div className="font-medium">{l.company}</div><div className="text-xs text-neutral-400">{l.website}</div></TableCell>
-                  <TableCell>{l.contact}</TableCell>
-                  <TableCell className="text-neutral-500 text-sm">{l.title}</TableCell>
-                  <TableCell className="text-neutral-500 text-sm">{l.industry}</TableCell>
-                  <TableCell className="text-neutral-500 text-sm">{l.employees}</TableCell>
-                  <TableCell className="text-neutral-500 text-sm">{l.revenue}</TableCell>
-                  <TableCell><Badge variant="secondary" className="rounded-full font-normal">{l.tech}</Badge></TableCell>
-                  <TableCell><div className="flex items-center gap-2"><div className="w-9 text-sm font-semibold">{l.score}</div><div className="w-12 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden"><div className="h-full bg-white text-black" style={{ width: `${l.score}%` }} /></div></div></TableCell>
-                  <TableCell><Badge className={`rounded-full font-medium border-0 ${statusColor[l.status]}`}>{l.status}</Badge></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
         </div>
-      </div>
+      )}
+
+      {state === "ready" && filtered.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 flex flex-col items-center text-center px-6" data-testid="leads-empty">
+          <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4"><Inbox className="w-6 h-6 text-neutral-500" /></div>
+          <h3 className="font-heading font-semibold text-lg">{query ? "No matching leads" : "No inbound leads yet"}</h3>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm">
+            {query ? `Nothing matches “${query}”.` : "Share your enquiry form link (e.g. from your Google Business Profile) and submissions will appear here."}
+          </p>
+        </div>
+      )}
+
+      {state === "ready" && filtered.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+          {filtered.map((lead, i) => {
+            const meta = STATUS_META[lead.status] || STATUS_META.new;
+            return (
+              <motion.div key={lead.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }}
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6" data-testid={`lead-row-${lead.id}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">{lead.name}</h3>
+                    {lead.company && <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-xs text-neutral-600 dark:text-neutral-300">{lead.company}</span>}
+                    <Badge className={`rounded-full border-0 font-medium ${meta.cls}`}>{meta.label}</Badge>
+                    {lead.auto_called_at && (
+                      <span data-testid={`lead-autocalled-${lead.id}`}
+                        title={lead.call_id ? `Bland call ${lead.call_id}` : undefined}
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 px-2 py-0.5 text-xs font-medium">
+                        <Zap className="w-3 h-3" /> Auto-called · {new Date(lead.auto_called_at).toLocaleString()}
+                      </span>
+                    )}
+                    <span data-testid={`lead-followup-${lead.id}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 text-xs font-medium">
+                      <Mail className="w-3 h-3" /> Follow-up {lead.followup_step ?? 0}/{MAX_FOLLOWUPS}
+                      {lead.last_followup_at ? ` · ${new Date(lead.last_followup_at).toLocaleString()}` : ""}
+                    </span>
+                    {lead.followup_unsubscribed && (
+                      <span data-testid={`lead-unsubscribed-${lead.id}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 px-2 py-0.5 text-xs font-medium">
+                        Unsubscribed
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-neutral-500">
+                    <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200"><PhoneIcon className="w-3 h-3" />{lead.phone}</a>
+                    <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200"><Mail className="w-3 h-3" />{lead.email}</a>
+                  </div>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">{lead.enquiry}</p>
+                </div>
+
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <CallButton lead={lead} />
+                  <FollowupButton lead={lead} onSent={load} />
+                  <select
+                    data-testid={`lead-status-${lead.id}`}
+                    value={lead.status}
+                    onChange={(e) => changeStatus(lead, e.target.value)}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 text-xs text-neutral-600 dark:text-neutral-300 outline-none"
+                  >
+                    {LEAD_STATUSES.map((s) => (
+                      <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>
+                    ))}
+                  </select>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,30 @@
+# Keep the build context small and never ship secrets or local cruft.
+.env
+.env.*
+!.env.example
+
+# Local virtualenvs (the image installs from requirements.txt).
+venv/
+venv*/
+.venv/
+env/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Docs & VCS aren't needed at runtime
+*.md
+.git/
+.gitignore
