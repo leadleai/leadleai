@@ -18,24 +18,27 @@ export default function Pricing() {
         ))}
       </div>
 
-      <div className="mt-20">
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-center">Frequently asked questions</h2>
-        <Accordion type="single" collapsible className="mt-8">
+      <div className="mt-24">
+        <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-center">Frequently asked questions</h2>
+        <Accordion type="single" collapsible className="mt-10">
           {faqs.map((f, i) => (
-            <AccordionItem key={i} value={`item-${i}`} className="border-neutral-200 dark:border-neutral-800">
-              <AccordionTrigger className="text-left font-heading font-medium hover:no-underline">{f.q}</AccordionTrigger>
-              <AccordionContent className="text-neutral-600 dark:text-neutral-400 leading-relaxed">{f.a}</AccordionContent>
+            <AccordionItem key={i} value={`item-${i}`} className="border-white/10">
+              <AccordionTrigger className="text-left font-heading font-medium hover:no-underline py-5">{f.q}</AccordionTrigger>
+              <AccordionContent className="text-neutral-400 font-light leading-relaxed">{f.a}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
       </div>
 
-      <div className="mt-16 rounded-2xl bg-neutral-900 border border-neutral-800 p-10 text-center text-white">
-        <h3 className="font-heading text-2xl font-bold">Need a custom plan?</h3>
-        <p className="text-white/80 mt-2">Talk to our team about volume pricing and enterprise features.</p>
-        <Button data-testid="pricing-page-contact-btn" onClick={() => navigate("/contact")} className="mt-6 rounded-full bg-white text-neutral-700 hover:bg-white/90 px-7 h-11">
-          Contact Sales <ArrowRight className="w-4 h-4 ml-1" />
-        </Button>
+      <div className="mt-20 rounded-3xl bg-white text-black p-10 sm:p-12 text-center relative overflow-hidden">
+        <div className="absolute inset-0 bw-grid-light opacity-60" />
+        <div className="relative">
+          <h3 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">Need a custom plan?</h3>
+          <p className="text-neutral-600 mt-3 font-light">Talk to our team about volume pricing and enterprise features.</p>
+          <Button data-testid="pricing-page-contact-btn" onClick={() => navigate("/contact")} className="mt-7 rounded-full bg-black text-white hover:bg-neutral-800 px-7 h-11 font-semibold">
+            Contact Sales <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
       </div>
     </MarketingPage>
   );

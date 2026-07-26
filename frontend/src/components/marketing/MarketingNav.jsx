@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Sun, Moon, Menu } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 import Logo from "@/components/shared/Logo";
-import { useTheme } from "@/lib/theme";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Magnetic } from "./motion";
 
+// Every marketing nav link now resolves to its own dedicated route.
 export const sectionLinks = [
-  { label: "Features", id: "features" },
-  { label: "How it works", id: "workflow" },
+  { label: "Features", to: "/features" },
+  { label: "How it works", to: "/how-it-works" },
   { label: "Pricing", to: "/pricing" },
-  { label: "FAQ", id: "faq" },
+  { label: "FAQ", to: "/faq" },
 ];
 
+// Kept for backwards compatibility with any page that still imports it:
+// on the landing page it smooth-scrolls to a section, otherwise it routes home.
 export function useSectionNav() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,74 +29,155 @@ export function useSectionNav() {
 }
 
 export default function MarketingNav() {
-  const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const goToSection = useSectionNav();
   const [open, setOpen] = useState(false);
-  const isHome = location.pathname === "/";
+  const [scrolled, setScrolled] = useState(false);
 
-  const handleLink = (link) => {
-    if (link.to) navigate(link.to);
-    else goToSection(link.id);
-    setOpen(false);
-  };
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  const isActive = (to) => location.pathname === to;
 
   return (
-    <header className="fixed top-0 w-full z-50 glass border-b border-black/10 dark:border-white/10">
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
-          <Logo className="w-7 h-7 text-foreground" />
-          <span className="font-heading font-bold text-lg tracking-tight">SaleScale AI</span>
-        </Link>
+    <>
+      <motion.header
+        initial={{ y: -80 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className={`fixed top-0 w-full z-50 transition-colors duration-300 ${
+          scrolled ? "bg-black/70 backdrop-blur-xl border-b border-white/10" : "bg-transparent border-b border-transparent"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between text-white">
+          <Link to="/" className="flex items-center gap-2.5 group" data-testid="landing-logo">
+            <Logo className="w-7 h-7 text-white transition-transform duration-500 group-hover:rotate-[360deg]" />
+            <span className="font-heading font-bold text-lg tracking-tight uppercase">SaleScale AI</span>
+          </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
-          {sectionLinks.map((l) => (
-            <button key={l.label} data-testid={`nav-link-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
-              onClick={() => handleLink(l)} className="hover:text-slate-900 dark:hover:text-white transition">
-              {l.label}
+          <nav className="hidden md:flex items-center gap-9 text-[13px] font-medium uppercase tracking-widest text-neutral-400">
+            {sectionLinks.map((l) => (
+              <Link
+                key={l.label}
+                to={l.to}
+                data-testid={`nav-link-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`bw-underline transition-colors hover:text-white ${isActive(l.to) ? "text-white" : ""}`}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="nav-contact-btn"
+              onClick={() => navigate("/enquiry")}
+              className="hidden lg:inline-flex text-[13px] font-medium uppercase tracking-widest text-neutral-400 hover:text-white transition-colors px-3 py-2 bw-underline"
+            >
+              Get in touch
             </button>
-          ))}
-        </nav>
+            <button
+              data-testid="nav-login-btn"
+              onClick={() => navigate("/login")}
+              className="hidden sm:inline-flex text-[13px] font-medium uppercase tracking-widest text-neutral-400 hover:text-white transition-colors px-3 py-2 bw-underline"
+            >
+              Log in
+            </button>
+            <Magnetic strength={0.4} className="hidden sm:block">
+              <button
+                data-testid="nav-signup-btn"
+                onClick={() => navigate("/signup")}
+                className="group inline-flex items-center gap-1.5 rounded-full bg-white text-black font-semibold text-sm px-5 h-10 hover:bg-neutral-200 transition-colors"
+              >
+                Start Free Trial
+                <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </button>
+            </Magnetic>
 
-        <div className="flex items-center gap-2">
-          {!isHome && (
-            <Button data-testid="landing-theme-toggle" variant="ghost" size="icon" onClick={toggle} className="rounded-xl">
-              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </Button>
-          )}
-          <Button data-testid="nav-contact-btn" variant="outline" onClick={() => navigate("/enquiry")} className="rounded-full hidden sm:inline-flex">Get in touch</Button>
-          <Button data-testid="nav-login-btn" variant="ghost" onClick={() => navigate("/login")} className="rounded-full hidden sm:inline-flex">Log in</Button>
-          <Button data-testid="nav-signup-btn" onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200 dark:bg-white dark:text-black font-medium">Start Free Trial</Button>
-
-          {/* Mobile menu */}
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button data-testid="landing-mobile-menu" variant="ghost" size="icon" className="rounded-xl md:hidden"><Menu className="w-5 h-5" /></Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-72">
-              <SheetHeader><SheetTitle className="text-left font-heading">Menu</SheetTitle></SheetHeader>
-              <div className="mt-6 flex flex-col gap-1">
-                {sectionLinks.map((l) => (
-                  <button key={l.label} data-testid={`mobile-nav-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
-                    onClick={() => handleLink(l)} className="text-left rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-                    {l.label}
-                  </button>
-                ))}
-                <SheetClose asChild>
-                  <Button data-testid="mobile-nav-contact-btn" onClick={() => navigate("/enquiry")} variant="outline" className="rounded-full mt-4">Get in touch</Button>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Button onClick={() => navigate("/login")} variant="outline" className="rounded-full">Log in</Button>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Button onClick={() => navigate("/signup")} className="rounded-full bg-white text-black hover:bg-neutral-200">Start Free Trial</Button>
-                </SheetClose>
-              </div>
-            </SheetContent>
-          </Sheet>
+            <button
+              data-testid="landing-mobile-menu"
+              onClick={() => setOpen(true)}
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-full border border-white/15 text-white hover:bg-white/10 transition"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </motion.header>
+
+      {/* Fullscreen mobile menu */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="fixed inset-0 z-[60] bg-black text-white md:hidden"
+            data-testid="mobile-menu-overlay"
+          >
+            <div className="bw-noise absolute inset-0 opacity-[0.06] pointer-events-none" />
+            <div className="relative flex items-center justify-between px-5 h-16 border-b border-white/10">
+              <span className="font-heading font-bold text-lg tracking-tight uppercase">SaleScale AI</span>
+              <button
+                onClick={() => setOpen(false)}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full border border-white/15 hover:bg-white/10 transition"
+                aria-label="Close menu"
+                data-testid="mobile-menu-close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="relative px-5 py-8 flex flex-col">
+              {sectionLinks.map((l, i) => (
+                <motion.div
+                  key={l.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 + i * 0.06 }}
+                >
+                  <Link
+                    to={l.to}
+                    data-testid={`mobile-nav-${l.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="block font-display text-4xl font-semibold tracking-tight py-3 border-b border-white/10 hover:pl-3 transition-all"
+                  >
+                    {l.label}
+                  </Link>
+                </motion.div>
+              ))}
+              <div className="mt-8 flex flex-col gap-3">
+                <button
+                  data-testid="mobile-nav-contact-btn"
+                  onClick={() => navigate("/enquiry")}
+                  className="rounded-full border border-white/20 h-12 font-medium uppercase tracking-widest text-sm hover:bg-white/10 transition"
+                >
+                  Get in touch
+                </button>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="rounded-full border border-white/20 h-12 font-medium uppercase tracking-widest text-sm hover:bg-white/10 transition"
+                >
+                  Log in
+                </button>
+                <button
+                  data-testid="mobile-nav-signup-btn"
+                  onClick={() => navigate("/signup")}
+                  className="rounded-full bg-white text-black h-12 font-semibold uppercase tracking-widest text-sm hover:bg-neutral-200 transition"
+                >
+                  Start Free Trial
+                </button>
+              </div>
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

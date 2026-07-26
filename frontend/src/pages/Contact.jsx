@@ -40,22 +40,22 @@ export default function Contact() {
   };
 
   return (
-    <MarketingPage title="Get in touch" subtitle="Questions about LeadPilot AI? Our team is here to help." testid="contact-page">
-      <div className="grid md:grid-cols-3 gap-8 mt-4">
-        <div className="space-y-6">
+    <MarketingPage kicker="Contact" title="Get in touch" subtitle="Questions about SaleScale AI? Our team is here to help." testid="contact-page">
+      <div className="grid md:grid-cols-3 gap-8">
+        <div className="space-y-4">
           {[
             { icon: Mail, label: "Email", value: "hello@leadpilot.ai" },
             { icon: Phone, label: "Phone", value: "+1 (415) 555-0100" },
             { icon: MapPin, label: "Office", value: "548 Market St, San Francisco, CA" },
           ].map((c) => (
-            <div key={c.label} className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-neutral-50 dark:bg-neutral-500/10 flex items-center justify-center text-neutral-600 shrink-0"><c.icon className="w-5 h-5" /></div>
+            <div key={c.label} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 hover:bg-white/[0.04] transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shrink-0"><c.icon className="w-5 h-5" /></div>
               <div><p className="text-sm font-medium">{c.label}</p><p className="text-sm text-neutral-500">{c.value}</p></div>
             </div>
           ))}
         </div>
 
-        <div className="md:col-span-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 sm:p-8">
+        <div className="md:col-span-2 rounded-3xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
           {sent ? (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8" data-testid="contact-success">
               <div className="w-16 h-16 rounded-2xl bg-neutral-50 dark:bg-neutral-500/10 flex items-center justify-center mx-auto"><CheckCircle2 className="w-8 h-8 text-neutral-500" /></div>

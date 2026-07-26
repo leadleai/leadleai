@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import MarketingNav from "@/components/marketing/MarketingNav";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { Reveal, AnimatedHeading, AnimatedKicker, Magnetic, PageTransition } from "@/components/marketing/motion";
 import { workflowSteps, features } from "@/lib/mockData";
 
 const iconMap = { Search, Microscope, Mail, Phone, CalendarClock, Workflow, Brain, BarChart3 };
@@ -28,25 +29,26 @@ export default function Demo() {
   return (
     <div className="dark min-h-screen bg-black text-white selection:bg-white selection:text-black" data-testid="demo-page">
       <MarketingNav />
+      <PageTransition>
 
       {/* Hero + video */}
-      <section className="relative overflow-hidden pt-32 pb-16 border-b border-neutral-900">
-        <div className="absolute inset-0 bg-gradient-to-b from-neutral-950 to-black" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[70%] h-[400px] bg-white/[0.05] blur-[120px] rounded-full" />
+      <section className="relative overflow-hidden pt-36 pb-16 border-b border-white/10">
+        <div className="absolute inset-0 bw-grid opacity-50" />
+        <div className="bw-noise absolute inset-0 opacity-[0.05] pointer-events-none" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[70%] h-[420px] bg-white/[0.06] blur-[120px] rounded-full" />
         <div className="relative max-w-5xl mx-auto px-6 sm:px-8 text-center">
-          <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="kicker text-neutral-500">Product Demo</motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
-            className="font-display text-4xl sm:text-6xl font-semibold tracking-tight mt-3">
-            See LeadPilot AI <span className="font-display-italic font-normal">in action.</span>
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
-            className="mt-4 text-lg text-neutral-400 font-light max-w-2xl mx-auto">
+          <AnimatedKicker className="font-mono text-[11px] uppercase tracking-[0.3em] text-neutral-500">Product Demo</AnimatedKicker>
+          <h1 className="font-display text-5xl sm:text-7xl font-semibold tracking-tight mt-4 leading-[0.95]">
+            <AnimatedHeading as="span" text="See SaleScale AI" className="inline" />{" "}
+            <span className="font-display-italic font-normal bw-shine">in action.</span>
+          </h1>
+          <Reveal delay={0.2} className="mt-6 text-lg text-neutral-400 font-light max-w-2xl mx-auto">
             Watch a 3-minute walkthrough of an autonomous sales cycle — from finding a lead to booking the meeting.
-          </motion.p>
+          </Reveal>
 
           {/* Video player */}
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.18, duration: 0.6 }}
-            className="relative mt-12 rounded-3xl overflow-hidden border border-neutral-800 aspect-video bg-neutral-950 group cursor-pointer"
+            className="relative mt-12 rounded-3xl overflow-hidden border border-white/10 aspect-video bg-white/[0.02] group cursor-pointer"
             data-testid="demo-video" onClick={() => setPlaying((p) => !p)}>
             <img src={DEMO_POSTER} alt="LeadPilot AI demo" className="w-full h-full object-cover grayscale contrast-125 opacity-70" />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
@@ -68,7 +70,7 @@ export default function Demo() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
             {chapters.map((c) => (
               <button key={c.t} onClick={() => setPlaying(true)} data-testid={`demo-chapter-${c.t.replace(":", "-")}`}
-                className="text-xs rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1.5 text-neutral-400 hover:border-white hover:text-white transition">
+                className="text-xs rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-neutral-400 hover:border-white hover:text-white transition">
                 <span className="font-mono text-neutral-500 mr-1.5">{c.t}</span>{c.label}
               </button>
             ))}
@@ -77,7 +79,7 @@ export default function Demo() {
       </section>
 
       {/* What you'll see — workflow */}
-      <section className="py-20 border-b border-neutral-900">
+      <section className="py-20 border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 sm:px-8">
           <p className="kicker text-neutral-500 text-center">What you&apos;ll see</p>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-center mt-3">The full cycle, end to end.</h2>
@@ -87,8 +89,8 @@ export default function Demo() {
               return (
                 <div key={step.label} className="flex items-center gap-3">
                   <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}
-                    className="flex flex-col items-center gap-2 rounded-2xl border border-neutral-800 bg-neutral-950 p-4 w-28 text-neutral-400">
-                    <div className="w-11 h-11 rounded-xl bg-neutral-900 text-neutral-300 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
+                    className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 w-28 text-neutral-400">
+                    <div className="w-11 h-11 rounded-xl bg-white/5 text-neutral-300 flex items-center justify-center"><Icon className="w-5 h-5" /></div>
                     <span className="text-xs font-medium text-center">{step.label}</span>
                   </motion.div>
                   {i < workflowSteps.length - 1 && <ArrowRight className="w-4 h-4 text-neutral-700 shrink-0 hidden sm:block" />}
@@ -100,14 +102,14 @@ export default function Demo() {
       </section>
 
       {/* Highlights */}
-      <section className="py-20 border-b border-neutral-900">
+      <section className="py-20 border-b border-white/10">
         <div className="max-w-5xl mx-auto px-6 sm:px-8">
           <div className="grid sm:grid-cols-2 gap-4">
             {features.slice(0, 4).map((f, i) => {
               const Icon = iconMap[f.icon] || Brain;
               return (
                 <motion.div key={f.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}
-                  className="rounded-2xl border border-neutral-800 bg-neutral-950 p-6 flex gap-4">
+                  className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 flex gap-4">
                   <div className="w-11 h-11 shrink-0 rounded-xl bg-white text-black flex items-center justify-center"><Icon className="w-5 h-5" /></div>
                   <div>
                     <h3 className="font-heading font-semibold">{f.title}</h3>
@@ -123,13 +125,15 @@ export default function Demo() {
       {/* CTA */}
       <section className="py-24">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 text-center">
-          <h2 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight">Ready to see it on your pipeline?</h2>
+          <AnimatedHeading text="Ready to see it on your pipeline?" className="font-display text-3xl sm:text-5xl font-semibold tracking-tight" />
           <p className="text-neutral-400 mt-4 font-light">Start a free 14-day trial — live in under 15 minutes. No credit card required.</p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button data-testid="demo-cta-signup" onClick={() => navigate("/signup")} size="lg"
-              className="rounded-full bg-white text-black hover:bg-neutral-200 px-8 h-12 text-base font-medium">
-              Start Free Trial <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+            <Magnetic strength={0.3}>
+              <Button data-testid="demo-cta-signup" onClick={() => navigate("/signup")} size="lg"
+                className="rounded-full bg-white text-black hover:bg-neutral-200 px-8 h-12 text-base font-semibold w-full sm:w-auto">
+                Start Free Trial <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Magnetic>
             <Button data-testid="demo-cta-contact" onClick={() => navigate("/contact")} size="lg" variant="ghost"
               className="rounded-full px-6 h-12 text-base text-neutral-300 hover:text-white hover:bg-white/5">
               Talk to sales
@@ -142,7 +146,7 @@ export default function Demo() {
           </ul>
         </div>
       </section>
-
+      </PageTransition>
       <MarketingFooter />
     </div>
   );

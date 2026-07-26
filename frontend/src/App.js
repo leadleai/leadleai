@@ -15,6 +15,13 @@ import Onboarding from "@/pages/Onboarding";
 import Demo from "@/pages/Demo";
 import Pricing from "@/pages/Pricing";
 import Contact from "@/pages/Contact";
+import Features from "@/pages/Features";
+import HowItWorks from "@/pages/HowItWorks";
+import FAQ from "@/pages/FAQ";
+import About from "@/pages/About";
+import Careers from "@/pages/Careers";
+import Blog from "@/pages/Blog";
+import Security from "@/pages/Security";
 import Privacy from "@/pages/legal/Privacy";
 import Terms from "@/pages/legal/Terms";
 import CookiePolicy from "@/pages/legal/CookiePolicy";
@@ -55,6 +62,13 @@ function App() {
             <Route path="/demo" element={<Demo />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/careers" element={<Careers />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/security" element={<Security />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<CookiePolicy />} />
