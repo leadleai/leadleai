@@ -88,23 +88,23 @@ function EmailLog() {
       )}
 
       {state === "loading" && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading email history…
         </div>
       )}
 
       {state === "error" && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="emails-error">
-          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+        <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="emails-error">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
             <AlertTriangle className="w-4 h-4" /> Couldn’t load email history
           </div>
-          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1 text-muted-foreground">{error}</p>
           <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
         </div>
       )}
 
       {state === "ready" && filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex flex-col items-center text-center px-6" data-testid="emails-empty">
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex flex-col items-center text-center px-6" data-testid="emails-empty">
           <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
             <Inbox className="w-6 h-6 text-neutral-500" />
           </div>
@@ -116,7 +116,7 @@ function EmailLog() {
       )}
 
       {state === "ready" && filtered.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10">
           {filtered.map((r) => {
             const open = expanded === r.id;
             return (
@@ -145,15 +145,15 @@ function EmailLog() {
                 {open && (
                   <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`email-expanded-${r.id}`}>
                     {r.error && (
-                      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-300">
-                        <span className="font-medium">Error:</span> {r.error}
+                      <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
+                        <span className="font-semibold">Error:</span> {r.error}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
                       {r.from_email && <span>From: {r.from_email}</span>}
                       {r.provider_id && <span>Resend id: {r.provider_id}</span>}
                     </div>
-                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 p-4">
+                    <div className="rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-neutral-950 p-4">
                       <div
                         className="text-sm text-neutral-700 dark:text-neutral-300 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-3 [&_blockquote]:text-neutral-500 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
                         dangerouslySetInnerHTML={{ __html: r.body || "<em>(no body recorded)</em>" }}
@@ -173,9 +173,9 @@ function EmailLog() {
 function StatusBadge({ status }) {
   const sent = status === "sent";
   return (
-    <Badge className={`rounded-full border-0 font-medium ${sent
-      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-      : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"}`}>
+    <Badge className={`rounded-full font-medium ${sent
+      ? "border-0 bg-neutral-900 text-white dark:bg-white dark:text-black"
+      : "border border-neutral-400 dark:border-white/40 bg-transparent text-neutral-600 dark:text-neutral-300"}`}>
       {sent ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
       {status}
     </Badge>
@@ -213,18 +213,18 @@ function EmailTemplates() {
 
   if (state === "loading") {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
+      <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
         <Loader2 className="w-4 h-4 animate-spin" /> Loading templates…
       </div>
     );
   }
   if (state === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm">
-        <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+      <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm">
+        <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
           <AlertTriangle className="w-4 h-4" /> Couldn’t load templates
         </div>
-        <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-1 text-muted-foreground">{error}</p>
         <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
       </div>
     );
@@ -242,7 +242,7 @@ function EmailTemplates() {
 
       {templates.map((t) => (
         <div key={t.step} data-testid={`template-${t.step}`}
-          className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-3">
+          className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Badge className="rounded-full border-0 bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
               Step {t.step}/3

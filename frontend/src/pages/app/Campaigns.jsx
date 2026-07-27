@@ -17,7 +17,7 @@ export default function Campaigns() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {campaigns.map((c, i) => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6" data-testid={`campaign-card-${c.id}`}>
+            className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6" data-testid={`campaign-card-${c.id}`}>
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-heading font-semibold text-lg">{c.name}</h3>

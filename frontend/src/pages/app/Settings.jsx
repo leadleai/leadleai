@@ -29,7 +29,7 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="profile">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl">
             <div className="flex items-center gap-4 mb-6">
               <Avatar className="w-16 h-16"><AvatarFallback className="bg-neutral-900 border border-neutral-800 text-white text-xl">AJ</AvatarFallback></Avatar>
               <Button variant="outline" className="rounded-full" onClick={() => toast.success("Photo updated")}>Change photo</Button>
@@ -51,7 +51,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="organization">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl space-y-4">
             <div className="space-y-2"><Label>Organization name</Label><Input defaultValue="Vertex Labs" className="rounded-xl" /></div>
             <div className="space-y-2"><Label>Website</Label><Input defaultValue="vertexlabs.io" className="rounded-xl" /></div>
             <div className="space-y-2"><Label>Custom domain</Label><Input defaultValue="mail.vertexlabs.io" className="rounded-xl" /></div>
@@ -60,7 +60,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="billing">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl">
             <div className="flex items-center justify-between rounded-xl bg-neutral-900 border border-neutral-800 p-5 text-white">
               <div><p className="text-white/80 text-sm">Current plan</p><p className="font-heading text-2xl font-bold">Growth · $399/mo</p></div>
               <CreditCard className="w-8 h-8 opacity-80" />
@@ -76,13 +76,13 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="team">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden max-w-2xl">
-            <div className="flex items-center justify-between px-5 h-14 border-b border-neutral-200 dark:border-neutral-800">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden max-w-2xl">
+            <div className="flex items-center justify-between px-5 h-14 border-b border-neutral-200 dark:border-white/10">
               <span className="font-heading font-semibold">Team members</span>
               <Button size="sm" data-testid="invite-member-btn" onClick={() => toast.success("Invite sent")} className="rounded-full bg-white text-black">Invite</Button>
             </div>
             {team.map((m) => (
-              <div key={m.email} className="flex items-center gap-3 px-5 py-3 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+              <div key={m.email} className="flex items-center gap-3 px-5 py-3 border-b border-neutral-100 dark:border-white/10 last:border-0">
                 <Avatar className="w-9 h-9"><AvatarFallback className="text-xs">{m.name.split(" ").map(n=>n[0]).join("")}</AvatarFallback></Avatar>
                 <div className="flex-1"><p className="text-sm font-medium">{m.name}</p><p className="text-xs text-neutral-400">{m.email}</p></div>
                 <Badge variant="secondary" className="rounded-full">{m.role}</Badge>
@@ -92,7 +92,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="security">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl space-y-4">
             {[["Two-factor authentication", "Add an extra layer of security", true], ["Single sign-on (SSO)", "Require SSO for all members", false], ["Session timeout", "Auto-logout after inactivity", true]].map(([t, d, on]) => (
               <div key={t} className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3"><Shield className="w-5 h-5 text-neutral-400" /><div><p className="font-medium text-sm">{t}</p><p className="text-xs text-neutral-400">{d}</p></div></div>
@@ -108,7 +108,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="notifications">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-4">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl space-y-4">
             {["Email sent", "Reply received", "Meeting booked", "Lead found", "Workflow completed", "Call completed"].map((n) => (
               <div key={n} className="flex items-center justify-between py-1.5">
                 <p className="font-medium text-sm">{n}</p>
@@ -147,16 +147,16 @@ function AutoCallSettings() {
 
   if (state === "loading") {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
+      <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
         <Loader2 className="w-4 h-4 animate-spin" /> Loading auto-call settings…
       </div>
     );
   }
   if (state === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 max-w-2xl text-sm">
-        <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300"><AlertTriangle className="w-4 h-4" /> Couldn’t load settings</div>
-        <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+      <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 max-w-2xl text-sm">
+        <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white"><AlertTriangle className="w-4 h-4" /> Couldn’t load settings</div>
+        <p className="mt-1 text-muted-foreground">{error}</p>
         <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
       </div>
     );
@@ -164,7 +164,7 @@ function AutoCallSettings() {
 
   const q = settings.quiet_hours || {};
   return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-5">
+    <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <PhoneCall className="w-5 h-5 text-neutral-400 mt-0.5" />
@@ -179,7 +179,7 @@ function AutoCallSettings() {
           onCheckedChange={toggle} />
       </div>
 
-      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
+      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-neutral-900 text-white dark:bg-white dark:text-black" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
         {settings.enabled ? "Auto-calling is ON" : "Auto-calling is OFF"}
       </Badge>
 
@@ -191,10 +191,10 @@ function AutoCallSettings() {
       </div>
 
       {!settings.bland_configured && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> BLAND_API_KEY isn’t set — auto-calls will fail until it’s configured in backend/.env.</p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> BLAND_API_KEY isn’t set — auto-calls will fail until it’s configured in backend/.env.</p>
       )}
       {!settings.supabase_configured && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Supabase isn’t configured — leads can’t be read/updated.</p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Supabase isn’t configured — leads can’t be read/updated.</p>
       )}
       <p className="text-xs text-neutral-400">Fine-tune the delay, hours and dedupe window via the AUTO_CALL_* variables in backend/.env. Manual calling from the Leads page always works regardless of this switch.</p>
     </div>
@@ -226,16 +226,16 @@ function FollowupSettings() {
 
   if (state === "loading") {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
+      <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl flex items-center gap-2 text-sm text-neutral-500">
         <Loader2 className="w-4 h-4 animate-spin" /> Loading follow-up settings…
       </div>
     );
   }
   if (state === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 max-w-2xl text-sm">
-        <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300"><AlertTriangle className="w-4 h-4" /> Couldn’t load follow-up settings</div>
-        <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+      <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 max-w-2xl text-sm">
+        <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white"><AlertTriangle className="w-4 h-4" /> Couldn’t load follow-up settings</div>
+        <p className="mt-1 text-muted-foreground">{error}</p>
         <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
       </div>
     );
@@ -244,7 +244,7 @@ function FollowupSettings() {
   const q = settings.quiet_hours || {};
   const schedule = (settings.schedule_hours || []).map((h) => `${h}h`).join(" → ");
   return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 max-w-2xl space-y-5">
+    <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 max-w-2xl space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <Mail className="w-5 h-5 text-neutral-400 mt-0.5" />
@@ -259,7 +259,7 @@ function FollowupSettings() {
         <Switch data-testid="followup-toggle" checked={!!settings.enabled} disabled={saving} onCheckedChange={toggle} />
       </div>
 
-      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
+      <Badge className={`rounded-full border-0 ${settings.enabled ? "bg-neutral-900 text-white dark:bg-white dark:text-black" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
         {settings.enabled ? "Follow-up emails are ON" : "Follow-up emails are OFF"}
       </Badge>
 
@@ -271,7 +271,7 @@ function FollowupSettings() {
       </div>
 
       {!settings.email_configured && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
           <AlertTriangle className="w-3.5 h-3.5" /> Email not configured — set RESEND_API_KEY and FOLLOWUP_FROM_EMAIL in backend/.env.
         </p>
       )}
@@ -312,7 +312,7 @@ function AIEmailToggle() {
   if (state !== "ready") return null; // stay quiet if the endpoint isn't reachable
 
   return (
-    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
+    <div className="rounded-xl border border-neutral-200 dark:border-white/10 p-4 space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <Sparkles className="w-5 h-5 text-neutral-400 mt-0.5" />
@@ -329,13 +329,13 @@ function AIEmailToggle() {
           disabled={saving || !settings.api_configured} onCheckedChange={toggle} />
       </div>
       {!settings.api_configured && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
           <AlertTriangle className="w-3.5 h-3.5" /> AI not configured — set ANTHROPIC_API_KEY in backend/.env.
         </p>
       )}
       {settings.api_configured && (
         <Badge className={`rounded-full border-0 ${settings.active
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+          ? "bg-neutral-900 text-white dark:bg-white dark:text-black"
           : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"}`}>
           {settings.active ? `AI is ON · ${settings.model}` : "AI is OFF — using templates"}
         </Badge>
@@ -346,7 +346,7 @@ function AIEmailToggle() {
 
 function Row({ label, value, icon: Icon }) {
   return (
-    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 px-3 py-2">
+    <div className="rounded-xl border border-neutral-200 dark:border-white/10 px-3 py-2">
       <p className="text-xs text-neutral-500 flex items-center gap-1">{Icon && <Icon className="w-3 h-3" />}{label}</p>
       <p className="font-medium mt-0.5">{value}</p>
     </div>

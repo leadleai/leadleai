@@ -55,7 +55,7 @@ export default function KnowledgeBase() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-500/5 p-4 flex items-start gap-3"
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-neutral-500/5 p-4 flex items-start gap-3"
             data-testid="kb-note">
             <div className="w-9 h-9 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center shrink-0 border border-neutral-200 dark:border-neutral-700">
               <Target className="w-4 h-4 text-neutral-600 dark:text-neutral-300" />
@@ -72,23 +72,23 @@ export default function KnowledgeBase() {
           )}
 
           {state === "loading" && (
-            <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
+            <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading knowledge base…
             </div>
           )}
 
           {state === "error" && (
-            <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="kb-error">
-              <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+            <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="kb-error">
+              <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
                 <AlertTriangle className="w-4 h-4" /> Couldn’t load the knowledge base
               </div>
-              <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+              <p className="mt-1 text-muted-foreground">{error}</p>
               <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
             </div>
           )}
 
           {state === "ready" && entries.length === 0 && !adding && (
-            <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex flex-col items-center text-center px-6" data-testid="kb-empty">
+            <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex flex-col items-center text-center px-6" data-testid="kb-empty">
               <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
                 <BookOpen className="w-6 h-6 text-neutral-500" />
               </div>
@@ -166,7 +166,7 @@ function EntryCard({ entry, mode, onCreated, onUpdated, onCancel, onDeleted }) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-3"
+      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 space-y-3"
       data-testid={isNew ? "kb-new-card" : `kb-card-${entry.id}`}>
       <div className="space-y-1.5">
         <Label>Title <span className="text-neutral-400 font-normal">(optional)</span></Label>
@@ -213,14 +213,14 @@ function EntryCard({ entry, mode, onCreated, onUpdated, onCancel, onDeleted }) {
                 <span className="text-xs text-neutral-500">Delete this entry?</span>
                 <Button size="sm" variant="ghost" className="rounded-full h-8"
                   onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</Button>
-                <Button size="sm" className="rounded-full h-8 bg-red-600 text-white hover:bg-red-700"
+                <Button size="sm" className="rounded-full h-8 bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
                   data-testid="kb-confirm-delete" onClick={remove} disabled={deleting}>
                   {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Delete"}
                 </Button>
               </div>
             ) : (
               <Button size="sm" variant="ghost" data-testid={`kb-delete-${entry.id}`}
-                className="rounded-full h-8 text-neutral-500 hover:text-red-600"
+                className="rounded-full h-8 text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                 onClick={() => setConfirmDelete(true)}>
                 <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
               </Button>
@@ -267,7 +267,7 @@ function TestMatchPanel({ entries }) {
     ? (entries.find((e) => e.id === result.entry_id)?.title || result.title) : null;
 
   return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 h-fit lg:sticky lg:top-4"
+    <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 h-fit lg:sticky lg:top-4"
       data-testid="kb-testmatch">
       <div className="flex items-center gap-2 mb-1">
         <FlaskConical className="w-4 h-4 text-neutral-600" />
@@ -289,26 +289,26 @@ function TestMatchPanel({ entries }) {
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4"
           data-testid="kb-testmatch-result">
           {result.matched ? (
-            <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-xl border border-neutral-900 dark:border-white/40 bg-neutral-50 dark:bg-white/[0.04] p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-white">
                 <Target className="w-4 h-4" /> Matches: {matchedTitle || "(untitled)"}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {result.matched_keywords.map((k) => (
-                  <Badge key={k} className="rounded-full border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 font-normal">{k}</Badge>
+                  <Badge key={k} className="rounded-full border-0 bg-neutral-900 text-white dark:bg-white dark:text-black font-normal">{k}</Badge>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-300/80">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Score {result.score} — this entry's content will fill the email.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-500/5 p-3 text-sm text-neutral-600 dark:text-neutral-300">
+            <div className="rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.02] p-3 text-sm text-neutral-600 dark:text-neutral-300">
               No entry matched — the follow-up would use the plain template. Try adding keywords from this enquiry to an entry.
             </div>
           )}
           {result.enabled === false && (
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+            <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5" /> KB matching is off (KB_MATCHING_ENABLED=false) — emails send plain templates.
             </p>
           )}

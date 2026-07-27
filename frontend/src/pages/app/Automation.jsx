@@ -26,8 +26,8 @@ export default function Automation() {
           </div>
         } />
 
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-        <div className="flex items-center gap-2 px-4 h-12 border-b border-neutral-200 dark:border-neutral-800">
+      <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden">
+        <div className="flex items-center gap-2 px-4 h-12 border-b border-neutral-200 dark:border-white/10">
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="zoom-in" onClick={() => setZoom(z => Math.min(1.4, z + 0.1))}><ZoomIn className="w-4 h-4" /></Button>
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="zoom-out" onClick={() => setZoom(z => Math.max(0.6, z - 0.1))}><ZoomOut className="w-4 h-4" /></Button>
           <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8" data-testid="undo" onClick={() => toast.info("Undo")}><Undo2 className="w-4 h-4" /></Button>

@@ -59,23 +59,23 @@ export default function Analytics() {
       />
 
       {state === "loading" && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 flex items-center justify-center gap-2 text-sm text-neutral-500">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-20 flex items-center justify-center gap-2 text-sm text-neutral-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading analytics…
         </div>
       )}
 
       {state === "error" && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="analytics-error">
-          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+        <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="analytics-error">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
             <AlertTriangle className="w-4 h-4" /> Couldn’t load analytics
           </div>
-          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
-          <button onClick={reload} className="mt-4 text-sm font-medium underline underline-offset-2">Try again</button>
+          <p className="mt-1 text-muted-foreground">{error}</p>
+          <button onClick={reload} className="mt-4 text-sm font-medium underline underline-offset-4 hover:opacity-70 transition-opacity">Try again</button>
         </div>
       )}
 
       {state === "ready" && !hasData && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.02]">
           <EmptyState icon={BarChart3} title="No data yet for this period"
             desc="There's no lead, call or email activity in this window yet. Pick a longer period, or check back once your pipeline is active." />
         </div>
@@ -95,8 +95,8 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={withLabels(timeseries)}>
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
-                  <YAxis allowDecimals={false} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={28} />
+                  <XAxis dataKey="label" stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
+                  <YAxis allowDecimals={false} stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} width={28} />
                   <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
                   <Bar dataKey="leads" name="Leads" fill="#737373" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -133,7 +133,7 @@ const withLabels = (ts) => ts.points.map((p) => ({ ...p, label: shortDay(p.day) 
 
 function ChartCard({ title, children, className = "" }) {
   return (
-    <div className={`rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 ${className}`}>
+    <div className={`rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 ${className}`}>
       <h3 className="font-heading font-semibold text-lg mb-4">{title}</h3>
       {children}
     </div>
@@ -145,8 +145,8 @@ function TwoSeriesBars({ data, a, b }) {
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
-        <XAxis dataKey="label" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
-        <YAxis allowDecimals={false} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={28} />
+        <XAxis dataKey="label" stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
+        <YAxis allowDecimals={false} stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} width={28} />
         <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
         <Legend />
         <Bar dataKey={a.key} name={a.name} fill={a.fill} radius={[6, 6, 0, 0]} />
@@ -158,7 +158,7 @@ function TwoSeriesBars({ data, a, b }) {
 
 function Totals({ items }) {
   return (
-    <div className="flex gap-6 mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+    <div className="flex gap-6 mt-3 pt-3 border-t border-neutral-100 dark:border-white/10">
       {items.map(([label, value]) => (
         <div key={label}>
           <p className="text-xs text-neutral-400">{label}</p>

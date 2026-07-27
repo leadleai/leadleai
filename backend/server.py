@@ -27,6 +27,7 @@ import ai_email
 from knowledge import router as knowledge_router
 from analytics import router as analytics_router
 from cron import router as cron_router
+import scheduler
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -111,10 +112,16 @@ app.include_router(cron_router)
 async def _startup():
     # Mongo is optional (no-op unless MONGO_URL is set) and never blocks boot.
     await mongo.ensure_indexes()
-    # NOTE: the follow-up drip and auto-caller are NO LONGER in-process loops.
-    # Cloud Scheduler drives them via POST /api/cron/followup-sweep and
-    # /api/cron/auto-call-sweep. See cron.py and DEPLOY_GCP.md.
-    logging.getLogger(__name__).info("startup complete; schedulers run via /api/cron/* (Cloud Scheduler)")
+    # Restore the in-process sweep loops so auto-call + follow-up run on their own
+    # on boot (auto-call ~60s, follow-up ~5-10 min). They call the SAME functions
+    # as the /api/cron/* endpoints — every guardrail is reused, not duplicated.
+    # Gated by INTERNAL_SCHEDULER_ENABLED (default TRUE); set it FALSE on Cloud Run
+    # (scale-to-zero) where Cloud Scheduler drives the cron endpoints instead.
+    scheduler.start()
+    logging.getLogger(__name__).info(
+        "startup complete; internal scheduler enabled=%s (cron endpoints /api/cron/* also available)",
+        scheduler.is_enabled(),
+    )
 
 
 # Cross-origin access for the frontend (e.g. the Vercel app). Comma-separated
@@ -140,4 +147,6 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    # Stop the sweep loops first so they don't run mid-teardown, then close Mongo.
+    await scheduler.stop()
     mongo.close()

@@ -10,12 +10,14 @@ import FollowupButton from "@/components/app/FollowupButton";
 import { leadsApi, crmApi, LEAD_STATUSES, MAX_FOLLOWUPS } from "@/lib/backend";
 import { toast } from "sonner";
 
+// Monochrome status treatments — meaning is carried by the label + fill/outline
+// weight (solid = fresh/actionable, outline = in-progress, muted = done), no hue.
 const STATUS_META = {
-  new: { label: "New", cls: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
-  contacted: { label: "Contacted", cls: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
-  interested: { label: "Interested", cls: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
-  meeting_booked: { label: "Meeting booked", cls: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
-  closed: { label: "Closed", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  new: { label: "New", cls: "bg-neutral-900 text-white dark:bg-white dark:text-black border-transparent" },
+  contacted: { label: "Contacted", cls: "border border-neutral-300 dark:border-white/25 bg-transparent text-neutral-700 dark:text-neutral-200" },
+  interested: { label: "Interested", cls: "border border-neutral-400 dark:border-white/40 bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-white" },
+  meeting_booked: { label: "Meeting booked", cls: "border border-neutral-900 dark:border-white bg-transparent text-neutral-900 dark:text-white font-semibold" },
+  closed: { label: "Closed", cls: "border border-neutral-200 dark:border-white/15 bg-transparent text-muted-foreground" },
 };
 
 export default function Leads() {
@@ -91,7 +93,7 @@ export default function Leads() {
           <div className="flex flex-wrap items-center gap-2">
             {crm && (
               <Badge data-testid="crm-provider-badge"
-                className={`rounded-full border-0 ${crm.ready ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"}`}>
+                className={`rounded-full ${crm.ready ? "border-0 bg-neutral-100 text-neutral-600 dark:bg-white/10 dark:text-neutral-300" : "border border-neutral-400 dark:border-white/40 bg-transparent text-neutral-700 dark:text-neutral-200"}`}>
                 CRM: {crm.provider}{crm.ready ? "" : " · not ready"}
               </Badge>
             )}
@@ -115,23 +117,23 @@ export default function Leads() {
       )}
 
       {state === "loading" && (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 text-sm text-neutral-500">
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-20 text-sm text-neutral-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading leads…
         </div>
       )}
 
       {state === "error" && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="leads-error">
-          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+        <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="leads-error">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
             <AlertTriangle className="w-4 h-4" /> Couldn’t load leads
           </div>
-          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1 text-muted-foreground">{error}</p>
           <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
         </div>
       )}
 
       {state === "ready" && filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-20 flex flex-col items-center text-center px-6" data-testid="leads-empty">
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.02] py-20 flex flex-col items-center text-center px-6" data-testid="leads-empty">
           <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4"><Inbox className="w-6 h-6 text-neutral-500" /></div>
           <h3 className="font-heading font-semibold text-lg">{query ? "No matching leads" : "No inbound leads yet"}</h3>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm">
@@ -141,7 +143,7 @@ export default function Leads() {
       )}
 
       {state === "ready" && filtered.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10">
           {filtered.map((lead, i) => {
             const meta = STATUS_META[lead.status] || STATUS_META.new;
             return (
@@ -151,11 +153,11 @@ export default function Leads() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium">{lead.name}</h3>
                     {lead.company && <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-xs text-neutral-600 dark:text-neutral-300">{lead.company}</span>}
-                    <Badge className={`rounded-full border-0 font-medium ${meta.cls}`}>{meta.label}</Badge>
+                    <Badge className={`rounded-full font-medium ${meta.cls}`}>{meta.label}</Badge>
                     {lead.auto_called_at && (
                       <span data-testid={`lead-autocalled-${lead.id}`}
                         title={lead.call_id ? `Bland call ${lead.call_id}` : undefined}
-                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 px-2 py-0.5 text-xs font-medium">
+                        className="inline-flex items-center gap-1 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-black px-2 py-0.5 text-xs font-medium">
                         <Zap className="w-3 h-3" /> Auto-called · {new Date(lead.auto_called_at).toLocaleString()}
                       </span>
                     )}
@@ -166,7 +168,7 @@ export default function Leads() {
                     </span>
                     {lead.followup_unsubscribed && (
                       <span data-testid={`lead-unsubscribed-${lead.id}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 px-2 py-0.5 text-xs font-medium">
+                        className="inline-flex items-center gap-1 rounded-full border border-neutral-400 dark:border-white/40 bg-transparent text-neutral-500 dark:text-neutral-400 line-through px-2 py-0.5 text-xs font-medium">
                         Unsubscribed
                       </span>
                     )}
@@ -185,7 +187,7 @@ export default function Leads() {
                     data-testid={`lead-status-${lead.id}`}
                     value={lead.status}
                     onChange={(e) => changeStatus(lead, e.target.value)}
-                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 text-xs text-neutral-600 dark:text-neutral-300 outline-none"
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-white/[0.02] px-2 py-1 text-xs text-neutral-600 dark:text-neutral-300 outline-none"
                   >
                     {LEAD_STATUSES.map((s) => (
                       <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>

@@ -74,10 +74,9 @@ function CallLog() {
       {state === "ready" && (
         <div className="grid grid-cols-3 gap-3" data-testid="calls-summary">
           <SummaryTile label="Total calls" value={summary.total} testid="calls-summary-total" />
-          <SummaryTile label="Placed" value={summary.placed} testid="calls-summary-placed"
-            className="text-emerald-600 dark:text-emerald-400" />
+          <SummaryTile label="Placed" value={summary.placed} testid="calls-summary-placed" />
           <SummaryTile label="Failed" value={summary.failed} testid="calls-summary-failed"
-            className="text-red-600 dark:text-red-400" />
+            className="text-muted-foreground" />
         </div>
       )}
 
@@ -109,23 +108,23 @@ function CallLog() {
       )}
 
       {state === "loading" && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading call history…
         </div>
       )}
 
       {state === "error" && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="calls-error">
-          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+        <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="calls-error">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
             <AlertTriangle className="w-4 h-4" /> Couldn’t load call history
           </div>
-          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1 text-muted-foreground">{error}</p>
           <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
         </div>
       )}
 
       {state === "ready" && filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex flex-col items-center text-center px-6" data-testid="calls-empty">
+        <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex flex-col items-center text-center px-6" data-testid="calls-empty">
           <div className="w-14 h-14 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
             <Phone className="w-6 h-6 text-neutral-500" />
           </div>
@@ -137,7 +136,7 @@ function CallLog() {
       )}
 
       {state === "ready" && filtered.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10">
           {filtered.map((r) => {
             const open = expanded === r.id;
             return (
@@ -165,8 +164,8 @@ function CallLog() {
                 {open && (
                   <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`call-expanded-${r.id}`}>
                     {r.error && (
-                      <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-300">
-                        <span className="font-medium">Error:</span> {r.error}
+                      <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
+                        <span className="font-semibold">Error:</span> {r.error}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
@@ -189,7 +188,7 @@ function CallLog() {
 function SummaryTile({ label, value, className = "", testid }) {
   return (
     <div data-testid={testid}
-      className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
+      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4">
       <p className="text-xs text-neutral-500 dark:text-neutral-400">{label}</p>
       <p className={`font-heading font-semibold text-2xl mt-1 ${className}`}>{value}</p>
     </div>
@@ -199,9 +198,9 @@ function SummaryTile({ label, value, className = "", testid }) {
 function StatusBadge({ status }) {
   const placed = status === "placed";
   return (
-    <Badge className={`rounded-full border-0 font-medium ${placed
-      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-      : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"}`}>
+    <Badge className={`rounded-full font-medium ${placed
+      ? "border-0 bg-neutral-900 text-white dark:bg-white dark:text-black"
+      : "border border-neutral-400 dark:border-white/40 bg-transparent text-neutral-600 dark:text-neutral-300"}`}>
       {placed ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
       {status}
     </Badge>
@@ -267,7 +266,7 @@ function LiveAgent() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
             <h4 className="font-heading font-semibold mb-4">Live Transcript</h4>
             <div className="space-y-3">
               {transcript.slice(0, visible).map((t, i) => (
@@ -282,7 +281,7 @@ function LiveAgent() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
             <h4 className="font-heading font-semibold mb-4">Live Analysis</h4>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-neutral-500">Sentiment</span><Badge className="rounded-full border-0 bg-neutral-100 text-neutral-700">Positive</Badge></div>
@@ -291,11 +290,11 @@ function LiveAgent() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
             <h4 className="font-heading font-semibold mb-4">Call History</h4>
             <div className="space-y-2">
               {calls.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0" data-testid={`call-history-${c.id}`}>
+                <div key={c.id} className="flex items-center gap-3 py-2 border-b border-neutral-100 dark:border-white/10 last:border-0" data-testid={`call-history-${c.id}`}>
                   <Button size="icon" variant="ghost" className="rounded-lg w-8 h-8 shrink-0" onClick={() => toast.info(`Playing recording · ${c.contact}`)}><Play className="w-4 h-4" /></Button>
                   <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{c.contact}</p><p className="text-xs text-neutral-400">{c.company} · {c.duration}</p></div>
                   <Badge className={`rounded-full border-0 text-xs ${sentimentColor[c.sentiment]}`}>{c.sentiment}</Badge>

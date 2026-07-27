@@ -88,11 +88,11 @@ function ComposeDialog({ lead, open, onOpenChange, onSent }) {
         )}
 
         {state === "error" && (
-          <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 text-sm">
-            <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+          <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-4 text-sm">
+            <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
               <AlertTriangle className="w-4 h-4" /> Couldn’t load the draft
             </div>
-            <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+            <p className="mt-1 text-muted-foreground">{error}</p>
           </div>
         )}
 
@@ -104,25 +104,25 @@ function ComposeDialog({ lead, open, onOpenChange, onSent }) {
               </Badge>
               {draft.ai_used && (
                 <Badge data-testid="compose-ai-badge"
-                  className="rounded-full border-0 bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                  className="rounded-full border-0 bg-neutral-900 text-white dark:bg-white dark:text-black">
                   <Sparkles className="w-3 h-3 mr-1" /> AI draft
                 </Badge>
               )}
               {!draft.ai_used && draft.kb_matched && (
                 <Badge data-testid="compose-kb-badge"
-                  className="rounded-full border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  className="rounded-full border border-neutral-300 dark:border-white/25 bg-transparent text-neutral-700 dark:text-neutral-200">
                   <Target className="w-3 h-3 mr-1" /> Matched: {draft.kb_matched}
                 </Badge>
               )}
               {draft.blocked && (
-                <Badge className="rounded-full border-0 bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <Badge className="rounded-full border border-neutral-400 dark:border-white/30 bg-transparent text-neutral-600 dark:text-neutral-300">
                   Blocked
                 </Badge>
               )}
             </div>
 
             {draft.blocked && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+              <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {draft.blocked}
               </p>
             )}

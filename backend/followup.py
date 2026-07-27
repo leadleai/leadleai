@@ -478,10 +478,13 @@ async def run_followup_sweep() -> dict:
 
 
 # ── Scheduling ───────────────────────────────────────────────────────────────
-# The in-process background loop was REMOVED for Cloud Run (scale-to-zero kills
-# it). run_followup_sweep() is now driven externally by Cloud Scheduler via
-# POST /api/cron/followup-sweep (see cron.py). Everything else in this module —
-# the schedule, the atomic step claim, the guardrails — is unchanged.
+# run_followup_sweep() has two drivers, both calling this SAME function so the
+# schedule, the atomic step claim, and the guardrails are shared unchanged:
+#   • the in-process loop in scheduler.py (default; runs every
+#     FOLLOWUP_INTERVAL_MINUTES on startup), and
+#   • Cloud Scheduler via POST /api/cron/followup-sweep (see cron.py), used on
+#     Cloud Run (scale-to-zero) where the in-process loop is disabled with
+#     INTERNAL_SCHEDULER_ENABLED=false.
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────

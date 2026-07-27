@@ -131,10 +131,10 @@ export default function Integrations() {
           const Icon = iconMap[it.icon] || Circle;
           return (
             <motion.div key={it.name} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (i % 6) * 0.05 }}
-              className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 flex flex-col" data-testid={`integration-${slug(it.name)}`}>
+              className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 flex flex-col" data-testid={`integration-${slug(it.name)}`}>
               <div className="flex items-start justify-between">
                 <div className="w-11 h-11 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Icon className="w-5 h-5 text-neutral-600 dark:text-neutral-300" /></div>
-                {it.connected && <Badge className="rounded-full border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"><Check className="w-3 h-3 mr-1" /> Connected</Badge>}
+                {it.connected && <Badge className="rounded-full border-0 bg-neutral-900 text-white dark:bg-white dark:text-black"><Check className="w-3 h-3 mr-1" /> Connected</Badge>}
               </div>
               <h3 className="font-heading font-semibold mt-4">{it.name}</h3>
               <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 flex-1">{it.desc}</p>
@@ -203,7 +203,7 @@ function ConnectBody({ integration, onConnect, onClose }) {
       {/* OAuth flow — provider consent screen */}
       {integration.type === "oauth" && (
         <div className="space-y-4 py-2" data-testid="consent-screen">
-          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+          <div className="rounded-xl border border-neutral-200 dark:border-white/10 overflow-hidden">
             <div className="bg-neutral-900 dark:bg-neutral-950 text-white px-4 py-3 flex items-center gap-2 text-sm">
               <Icon className="w-4 h-4" /> Sign in to {integration.name}
             </div>
@@ -214,7 +214,7 @@ function ConnectBody({ integration, onConnect, onClose }) {
               <ul className="mt-3 space-y-2">
                 {integration.scopes.split(",").map((s) => (
                   <li key={s} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-200">
-                    <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0"><Check className="w-3 h-3" /></span>
+                    <span className="w-5 h-5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-black flex items-center justify-center shrink-0"><Check className="w-3 h-3" /></span>
                     Read &amp; write your <span className="font-medium">{s.trim()}</span>
                   </li>
                 ))}

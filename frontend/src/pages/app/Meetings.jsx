@@ -20,7 +20,7 @@ export default function Meetings() {
         action={<Button data-testid="new-meeting-btn" onClick={() => toast.success("Meeting slot shared")} className="rounded-full bg-white text-black hover:shadow-lg"><Plus className="w-4 h-4 mr-1" /> New Meeting</Button>} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+        <div className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
           <div className="flex flex-col md:flex-row gap-6">
             <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-xl" data-testid="scheduler-calendar" />
             <div className="flex-1">
@@ -29,7 +29,7 @@ export default function Meetings() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {slots.map((s) => (
                   <button key={s} data-testid={`slot-${s.replace(/[:\s]/g,"")}`} onClick={() => setSlot(s)}
-                    className={`rounded-xl border py-2.5 text-sm font-medium transition-all ${slot === s ? "border-neutral-500 bg-neutral-50 dark:bg-neutral-500/10 text-neutral-600" : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300"}`}>{s}</button>
+                    className={`rounded-xl border py-2.5 text-sm font-medium transition-all ${slot === s ? "border-neutral-500 bg-neutral-50 dark:bg-neutral-500/10 text-neutral-600" : "border-neutral-200 dark:border-white/10 hover:border-neutral-300"}`}>{s}</button>
                 ))}
               </div>
               <Button data-testid="confirm-booking-btn" onClick={() => toast.success(`Meeting confirmed for ${slot}`)} className="w-full mt-4 rounded-full bg-white text-black">Confirm Booking</Button>
@@ -37,12 +37,12 @@ export default function Meetings() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
           <h4 className="font-heading font-semibold mb-4">Upcoming meetings</h4>
           <div className="space-y-3">
             {meetings.map((m, i) => (
               <motion.div key={m.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
-                className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3.5" data-testid={`meeting-${m.id}`}>
+                className="rounded-xl border border-neutral-200 dark:border-white/10 p-3.5" data-testid={`meeting-${m.id}`}>
                 <div className="flex items-center justify-between"><Badge className={`rounded-full border-0 text-xs ${typeColor[m.type]}`}>{m.type}</Badge><span className="text-xs text-neutral-400">{m.date}</span></div>
                 <p className="font-medium text-sm mt-2">{m.title}</p>
                 <p className="text-xs text-neutral-400">with {m.with}</p>

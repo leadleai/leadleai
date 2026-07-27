@@ -54,12 +54,12 @@ export default function CallButton({ lead }) {
           : <><PhoneCall className="w-3.5 h-3.5 mr-1" /> Call</>}
       </Button>
       {phase === "done" && callId && (
-        <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+        <span className="flex items-center gap-1 text-xs font-medium text-neutral-900 dark:text-white">
           <Check className="w-3 h-3" /> Call started · {callId}
         </span>
       )}
       {phase === "error" && error && (
-        <span className="flex items-start gap-1 max-w-[16rem] text-right text-xs text-red-600 dark:text-red-400">
+        <span className="flex items-start gap-1 max-w-[16rem] text-right text-xs text-muted-foreground">
           <X className="w-3 h-3 mt-0.5 shrink-0" /> {error}
         </span>
       )}

@@ -85,7 +85,7 @@ export default function Team() {
 
       {/* Public enquiry form for this org */}
       {formUrl && (
-        <div className="mb-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5"
+        <div className="mb-6 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5"
           data-testid="team-form-url">
           <div className="flex items-center gap-2 mb-1">
             <Link2 className="w-4 h-4 text-neutral-500" />
@@ -107,7 +107,7 @@ export default function Team() {
       {/* Invite */}
       {isOwner && (
         <form onSubmit={invite} data-testid="team-invite-form"
-          className="mb-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5">
+          className="mb-6 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5">
           <h4 className="font-heading font-semibold text-sm mb-1">Invite a teammate</h4>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
             If they already have an account they're added right away; otherwise they join this
@@ -130,24 +130,24 @@ export default function Team() {
       )}
 
       {state === "loading" && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
+        <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] py-16 flex items-center justify-center gap-2 text-sm text-neutral-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading team…
         </div>
       )}
 
       {state === "error" && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-6 text-sm" data-testid="team-error">
-          <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
+        <div className="rounded-2xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-6 text-sm" data-testid="team-error">
+          <div className="flex items-center gap-2 font-semibold text-neutral-900 dark:text-white">
             <AlertTriangle className="w-4 h-4" /> Couldn't load your team
           </div>
-          <p className="mt-1 text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1 text-muted-foreground">{error}</p>
           <Button variant="outline" className="mt-4 rounded-full" onClick={load}>Try again</Button>
         </div>
       )}
 
       {state === "ready" && (
         <>
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800"
+          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10"
             data-testid="team-members">
             {data.members.map((m) => (
               <div key={m.id} className="p-4 flex items-center gap-3" data-testid={`team-member-${m.id}`}>
@@ -182,7 +182,7 @@ export default function Team() {
               <h4 className="font-heading font-semibold text-sm mb-2 flex items-center gap-2">
                 <MailCheck className="w-4 h-4 text-neutral-500" /> Pending invites
               </h4>
-              <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800"
+              <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10"
                 data-testid="team-invites">
                 {data.invites.map((inv) => (
                   <div key={inv.id} className="p-4 flex items-center gap-3" data-testid={`team-invite-${inv.id}`}>

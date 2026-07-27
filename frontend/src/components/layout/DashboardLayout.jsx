@@ -42,9 +42,9 @@ function SidebarContent({ onNavigate }) {
   const location = useLocation();
   return (
     <div className="flex h-full flex-col">
-      <Link to="/app" className="flex items-center gap-2.5 px-5 h-16 shrink-0" data-testid="sidebar-logo">
-        <Logo className="w-6 h-6 text-foreground" />
-        <span className="font-heading font-bold text-lg tracking-tight">SaleScale AI</span>
+      <Link to="/app" className="flex items-center gap-2.5 px-5 h-16 shrink-0 group" data-testid="sidebar-logo">
+        <Logo className="w-6 h-6 text-foreground transition-transform duration-500 group-hover:rotate-[360deg]" />
+        <span className="font-heading font-bold text-lg tracking-tight uppercase">SaleScale AI</span>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {nav.map((item) => {
@@ -55,23 +55,24 @@ function SidebarContent({ onNavigate }) {
               to={item.path}
               onClick={onNavigate}
               data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 active
                   ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                  : "text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
               }`}
             >
-              <item.icon className="w-[18px] h-[18px]" />
+              <item.icon className={`w-[18px] h-[18px] transition-transform duration-200 ${active ? "" : "group-hover:scale-110"}`} />
               {item.label}
             </Link>
           );
         })}
       </nav>
       <div className="p-3">
-        <div className="rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4">
-          <p className="font-heading font-semibold text-sm">Upgrade to Growth</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Unlock unlimited AI leads & calls.</p>
-          <Button data-testid="sidebar-upgrade-btn" onClick={() => toast.success("Upgrade flow started")} className="mt-3 w-full h-8 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90 text-xs">Upgrade</Button>
+        <div className="rounded-2xl bg-neutral-100 dark:bg-white/[0.03] border border-neutral-200 dark:border-white/10 p-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Plan</p>
+          <p className="font-heading font-semibold text-sm mt-1">Upgrade to Growth</p>
+          <p className="text-xs text-muted-foreground mt-1">Unlock unlimited AI leads & calls.</p>
+          <Button data-testid="sidebar-upgrade-btn" onClick={() => toast.success("Upgrade flow started")} className="mt-3 w-full h-8 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90 text-xs font-semibold">Upgrade</Button>
         </div>
       </div>
     </div>
@@ -203,18 +204,19 @@ function UserMenu() {
 export default function DashboardLayout() {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cmdOpen, setCmdOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 selection:bg-neutral-100">
+    <div className="min-h-screen bg-neutral-50 dark:bg-black text-neutral-900 dark:text-neutral-100 selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-30">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-black z-30">
         <SidebarContent />
       </aside>
 
       <div className="lg:pl-64">
         {/* Top navbar */}
-        <header className="sticky top-0 z-20 h-16 glass border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-3 px-4 sm:px-6">
+        <header className="sticky top-0 z-20 h-16 glass border-b border-neutral-200 dark:border-white/10 flex items-center gap-3 px-4 sm:px-6">
           {/* Mobile menu */}
           <Sheet>
             <SheetTrigger asChild>
@@ -229,7 +231,7 @@ export default function DashboardLayout() {
           <button
             data-testid="global-search-trigger"
             onClick={() => setCmdOpen(true)}
-            className="flex items-center gap-2 flex-1 max-w-md h-10 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3.5 text-sm text-neutral-400"
+            className="flex items-center gap-2 flex-1 max-w-md h-10 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.03] px-3.5 text-sm text-muted-foreground hover:border-neutral-400 dark:hover:border-white/25 transition-colors"
           >
             <Search className="w-4 h-4" /> Search leads, companies, meetings...
             <span className="ml-auto hidden sm:flex items-center gap-1 text-xs text-neutral-400"><Command className="w-3 h-3" />K</span>
@@ -267,9 +269,13 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-6 lg:p-8 pb-24">
+        <motion.main
+          key={location.pathname}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          className="p-4 sm:p-6 lg:p-8 pb-24"
+        >
           <Outlet />
-        </main>
+        </motion.main>
       </div>
 
       <AIAssistant />
