@@ -19,11 +19,12 @@ from auth import OrgContext, require_org
 from .base import CrmAdapter, CrmNotConfigured
 from .mock import MockCrmAdapter
 from .sangam import SangamCrmAdapter
+from .hubspot import HubSpotCrmAdapter
 
 logger = logging.getLogger("crm")
 router = APIRouter(prefix="/api/crm", tags=["crm"])
 
-_ADAPTERS = {"mock": MockCrmAdapter, "sangam": SangamCrmAdapter}
+_ADAPTERS = {"mock": MockCrmAdapter, "sangam": SangamCrmAdapter, "hubspot": HubSpotCrmAdapter}
 
 
 def get_adapter() -> CrmAdapter:

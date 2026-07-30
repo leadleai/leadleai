@@ -165,8 +165,10 @@ function EntryCard({ entry, mode, onCreated, onUpdated, onCancel, onDeleted }) {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 space-y-3"
+    <motion.div
+      initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 260, damping: 24 }}
+      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 space-y-3 transition-colors hover:border-neutral-300 dark:hover:border-white/20"
       data-testid={isNew ? "kb-new-card" : `kb-card-${entry.id}`}>
       <div className="space-y-1.5">
         <Label>Title <span className="text-neutral-400 font-normal">(optional)</span></Label>

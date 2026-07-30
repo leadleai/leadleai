@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 // and Analytics pages. Controlled: parent owns `value` and gets `onChange`.
 export default function PeriodFilter({ value, onChange }) {
   return (
-    <div className="inline-flex rounded-full border border-neutral-200 dark:border-neutral-800 p-1" data-testid="period-filter">
+    <div className="inline-flex rounded-full border border-neutral-200 dark:border-white/10 p-1" data-testid="period-filter">
       {ANALYTICS_PERIODS.map((p) => (
         <Button
           key={p.value}

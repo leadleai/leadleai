@@ -4,6 +4,7 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
 import { Download, Users, Phone, Mail, CalendarClock, Loader2, AlertTriangle, BarChart3 } from "lucide-react";
+import { motion } from "framer-motion";
 import { PageHeader, StatCard, EmptyState } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import PeriodFilter from "@/components/app/PeriodFilter";
@@ -98,7 +99,8 @@ export default function Analytics() {
                   <XAxis dataKey="label" stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
                   <YAxis allowDecimals={false} stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} width={28} />
                   <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
-                  <Bar dataKey="leads" name="Leads" fill="#737373" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="leads" name="Leads" fill="#737373" radius={[6, 6, 0, 0]}
+                    isAnimationActive animationDuration={1100} animationEasing="ease-out" />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -133,10 +135,14 @@ const withLabels = (ts) => ts.points.map((p) => ({ ...p, label: shortDay(p.day) 
 
 function ChartCard({ title, children, className = "" }) {
   return (
-    <div className={`rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 ${className}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className={`rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 ${className}`}
+    >
       <h3 className="font-heading font-semibold text-lg mb-4">{title}</h3>
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -149,8 +155,10 @@ function TwoSeriesBars({ data, a, b }) {
         <YAxis allowDecimals={false} stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} width={28} />
         <Tooltip contentStyle={TOOLTIP} cursor={{ fill: "#8888881f" }} />
         <Legend />
-        <Bar dataKey={a.key} name={a.name} fill={a.fill} radius={[6, 6, 0, 0]} />
-        <Bar dataKey={b.key} name={b.name} fill={b.fill} radius={[6, 6, 0, 0]} />
+        <Bar dataKey={a.key} name={a.name} fill={a.fill} radius={[6, 6, 0, 0]}
+          isAnimationActive animationDuration={1000} animationEasing="ease-out" />
+        <Bar dataKey={b.key} name={b.name} fill={b.fill} radius={[6, 6, 0, 0]}
+          isAnimationActive animationDuration={1000} animationBegin={200} animationEasing="ease-out" />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -181,7 +189,8 @@ function StatusPie({ breakdown, total }) {
     <>
       <ResponsiveContainer width="100%" height={200}>
         <PieChart>
-          <Pie data={data} innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+          <Pie data={data} innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value"
+            isAnimationActive animationDuration={900} animationBegin={150} animationEasing="ease-out">
             {data.map((d, i) => <Cell key={d.key} fill={PIE_COLORS[STATUS_ORDER.indexOf(d.key) % PIE_COLORS.length]} />)}
           </Pie>
           <Tooltip contentStyle={TOOLTIP} />

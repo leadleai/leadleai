@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Phone, PhoneCall, Mic, PhoneOff, Play, Search, RefreshCw, Loader2,
   AlertTriangle, Check, X, ChevronDown, ChevronRight,
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CountUp } from "@/components/app/motion";
 import { callsApi } from "@/lib/backend";
 import { calls, transcript } from "@/lib/mockData";
 import { toast } from "sonner";
@@ -137,14 +138,17 @@ function CallLog() {
 
       {state === "ready" && filtered.length > 0 && (
         <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10">
-          {filtered.map((r) => {
+          {filtered.map((r, i) => {
             const open = expanded === r.id;
             return (
-              <div key={r.id} data-testid={`call-row-${r.id}`}>
+              <motion.div key={r.id} data-testid={`call-row-${r.id}`}
+                initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i, 12) * 0.035, type: "spring", stiffness: 280, damping: 26 }}>
                 <button onClick={() => setExpanded(open ? null : r.id)}
-                  className="w-full text-left p-4 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
-                  {open ? <ChevronDown className="w-4 h-4 mt-1 text-neutral-400 shrink-0" />
-                        : <ChevronRight className="w-4 h-4 mt-1 text-neutral-400 shrink-0" />}
+                  className="w-full text-left p-4 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-white/[0.03] transition-colors">
+                  <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="mt-1 shrink-0">
+                    <ChevronRight className="w-4 h-4 text-neutral-400" />
+                  </motion.span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-sm">{r.to_phone}</span>
@@ -161,22 +165,28 @@ function CallLog() {
                   </span>
                 </button>
 
-                {open && (
-                  <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`call-expanded-${r.id}`}>
-                    {r.error && (
-                      <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
-                        <span className="font-semibold">Error:</span> {r.error}
+                <AnimatePresence initial={false}>
+                  {open && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden">
+                      <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`call-expanded-${r.id}`}>
+                        {r.error && (
+                          <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
+                            <span className="font-semibold">Error:</span> {r.error}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+                          <span>Call id: {r.call_id || "—"}</span>
+                          <span>Trigger: {r.trigger}</span>
+                          {r.lead_id && <span>Lead id: {r.lead_id}</span>}
+                          {r.created_at && <span>{new Date(r.created_at).toLocaleString()}</span>}
+                        </div>
                       </div>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
-                      <span>Call id: {r.call_id || "—"}</span>
-                      <span>Trigger: {r.trigger}</span>
-                      {r.lead_id && <span>Lead id: {r.lead_id}</span>}
-                      {r.created_at && <span>{new Date(r.created_at).toLocaleString()}</span>}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
             );
           })}
         </div>
@@ -187,11 +197,13 @@ function CallLog() {
 
 function SummaryTile({ label, value, className = "", testid }) {
   return (
-    <div data-testid={testid}
-      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4">
+    <motion.div data-testid={testid}
+      initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }} whileHover={{ y: -4 }}
+      className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4 transition-colors hover:border-neutral-900 dark:hover:border-white/30">
       <p className="text-xs text-neutral-500 dark:text-neutral-400">{label}</p>
-      <p className={`font-heading font-semibold text-2xl mt-1 ${className}`}>{value}</p>
-    </div>
+      <p className={`font-display font-semibold text-2xl mt-1 ${className}`}><CountUp value={String(value)} /></p>
+    </motion.div>
   );
 }
 

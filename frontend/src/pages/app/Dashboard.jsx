@@ -6,7 +6,9 @@ import {
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+import { motion } from "framer-motion";
 import { StatCard, PageHeader } from "@/components/shared/Primitives";
+import { Reveal, Stagger, itemVariants } from "@/components/app/motion";
 import PeriodFilter from "@/components/app/PeriodFilter";
 import { useAnalytics, shortDay, timeAgo } from "@/lib/useAnalytics";
 import { useAuth } from "@/lib/auth";
@@ -69,27 +71,27 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6">
+            <Reveal delay={0.05} className="lg:col-span-2 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-heading font-semibold text-lg">New leads over time</h3>
                 <LineIcon className="w-5 h-5 text-neutral-400" />
               </div>
               <LeadsAreaChart points={timeseries.points} />
-            </div>
+            </Reveal>
 
-            <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6">
+            <Reveal delay={0.15} className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6">
               <h3 className="font-heading font-semibold text-lg mb-4">Leads by status</h3>
               <StatusBreakdown breakdown={summary.status_breakdown} total={summary.leads_new} />
-            </div>
+            </Reveal>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 mt-6">
+          <Reveal delay={0.1} className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-6 mt-6">
             <div className="flex items-center gap-2 mb-4">
               <ActivityIcon className="w-5 h-5 text-neutral-400" />
               <h3 className="font-heading font-semibold text-lg">Recent activity</h3>
             </div>
             <ActivityFeed items={activity?.items || []} />
-          </div>
+          </Reveal>
         </>
       )}
     </div>
@@ -111,7 +113,8 @@ function LeadsAreaChart({ points }) {
         <XAxis dataKey="label" stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} minTickGap={16} />
         <YAxis allowDecimals={false} stroke="#a3a3a3" fontSize={12} tickLine={false} axisLine={false} width={28} />
         <Tooltip contentStyle={TOOLTIP} />
-        <Area type="monotone" dataKey="leads" name="Leads" stroke="#737373" fill="url(#dashLeads)" strokeWidth={2} />
+        <Area type="monotone" dataKey="leads" name="Leads" stroke="#737373" fill="url(#dashLeads)" strokeWidth={2}
+          isAnimationActive animationDuration={1500} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -126,15 +129,19 @@ function StatusBreakdown({ breakdown, total }) {
         const count = breakdown?.[s] || 0;
         const pct = total ? Math.round((count / total) * 100) : 0;
         return (
-          <div key={s} data-testid={`status-${s}`}>
+          <motion.div key={s} data-testid={`status-${s}`}
+            initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+            transition={{ delay: order.indexOf(s) * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
             <div className="flex items-center justify-between text-sm mb-1">
               <span className="text-neutral-600 dark:text-neutral-300">{STATUS_LABELS[s]}</span>
               <span className="font-medium">{count}</span>
             </div>
             <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-              <div className="h-full rounded-full bg-neutral-700 dark:bg-neutral-300" style={{ width: `${pct}%` }} />
+              <motion.div className="h-full rounded-full bg-neutral-700 dark:bg-neutral-300"
+                initial={{ width: 0 }} whileInView={{ width: `${pct}%` }} viewport={{ once: true }}
+                transition={{ delay: 0.2 + order.indexOf(s) * 0.08, duration: 0.9, ease: [0.16, 1, 0.3, 1] }} />
             </div>
-          </div>
+          </motion.div>
         );
       })}
     </div>
@@ -152,12 +159,13 @@ function ActivityFeed({ items }) {
     );
   }
   return (
-    <div className="space-y-1" data-testid="activity-feed">
+    <Stagger className="space-y-1" stagger={0.05} data-testid="activity-feed">
       {items.map((a) => {
         const Icon = ACTIVITY_ICON[a.type] || ActivityIcon;
         const failed = a.status === "failed";
         return (
-          <div key={a.id} data-testid={`activity-${a.id}`}
+          <motion.div key={a.id} data-testid={`activity-${a.id}`} variants={itemVariants}
+            whileHover={{ x: 4 }}
             className="flex items-center gap-3 py-2.5 border-b border-neutral-100 dark:border-white/10 last:border-0">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
               failed ? "border-neutral-400 dark:border-white/30 bg-transparent" : "border-transparent bg-neutral-100 dark:bg-white/5"}`}>
@@ -165,10 +173,10 @@ function ActivityFeed({ items }) {
             </div>
             <p className="text-sm flex-1">{a.label}</p>
             <span className="text-xs text-neutral-400 shrink-0">{timeAgo(a.at)}</span>
-          </div>
+          </motion.div>
         );
       })}
-    </div>
+    </Stagger>
   );
 }
 

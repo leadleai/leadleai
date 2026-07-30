@@ -147,8 +147,11 @@ export default function Leads() {
           {filtered.map((lead, i) => {
             const meta = STATUS_META[lead.status] || STATUS_META.new;
             return (
-              <motion.div key={lead.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6" data-testid={`lead-row-${lead.id}`}>
+              <motion.div key={lead.id}
+                initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i, 10) * 0.05, type: "spring", stiffness: 260, damping: 24 }}
+                whileHover={{ x: 5 }}
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 hover:bg-neutral-50 dark:hover:bg-white/[0.03] transition-colors" data-testid={`lead-row-${lead.id}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium">{lead.name}</h3>

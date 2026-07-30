@@ -27,6 +27,7 @@ import ai_email
 from knowledge import router as knowledge_router
 from analytics import router as analytics_router
 from cron import router as cron_router
+from geo import router as geo_router
 import scheduler
 
 # Create the main app without a prefix
@@ -106,6 +107,9 @@ app.include_router(public_org_router)
 # Cloud Scheduler → cron sweeps (secured by X-Cron-Secret). Replaces the old
 # in-process background loops so scheduling survives Cloud Run scale-to-zero.
 app.include_router(cron_router)
+# Public, unauthenticated visitor-country lookup for DISPLAY-ONLY currency on the
+# marketing pricing page. Cosmetic — never touches billing; always falls back safely.
+app.include_router(geo_router)
 
 
 @app.on_event("startup")

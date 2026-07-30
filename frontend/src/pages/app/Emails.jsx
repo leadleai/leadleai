@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, RefreshCw, Loader2, AlertTriangle, Inbox, Check, X, ChevronDown, ChevronRight, Save,
 } from "lucide-react";
@@ -117,14 +118,17 @@ function EmailLog() {
 
       {state === "ready" && filtered.length > 0 && (
         <div className="rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-neutral-100 dark:divide-white/10">
-          {filtered.map((r) => {
+          {filtered.map((r, i) => {
             const open = expanded === r.id;
             return (
-              <div key={r.id} data-testid={`email-row-${r.id}`}>
+              <motion.div key={r.id} data-testid={`email-row-${r.id}`}
+                initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i, 12) * 0.035, type: "spring", stiffness: 280, damping: 26 }}>
                 <button onClick={() => setExpanded(open ? null : r.id)}
-                  className="w-full text-left p-4 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
-                  {open ? <ChevronDown className="w-4 h-4 mt-1 text-neutral-400 shrink-0" />
-                        : <ChevronRight className="w-4 h-4 mt-1 text-neutral-400 shrink-0" />}
+                  className="w-full text-left p-4 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-white/[0.03] transition-colors">
+                  <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="mt-1 shrink-0">
+                    <ChevronRight className="w-4 h-4 text-neutral-400" />
+                  </motion.span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-sm">{r.to_email}</span>
@@ -142,26 +146,32 @@ function EmailLog() {
                   </span>
                 </button>
 
-                {open && (
-                  <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`email-expanded-${r.id}`}>
-                    {r.error && (
-                      <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
-                        <span className="font-semibold">Error:</span> {r.error}
+                <AnimatePresence initial={false}>
+                  {open && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }} className="overflow-hidden">
+                      <div className="px-4 pb-4 pl-11 space-y-3" data-testid={`email-expanded-${r.id}`}>
+                        {r.error && (
+                          <div className="rounded-xl border border-neutral-300 dark:border-white/15 bg-neutral-50 dark:bg-white/[0.03] p-3 text-xs text-neutral-700 dark:text-neutral-300">
+                            <span className="font-semibold">Error:</span> {r.error}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+                          {r.from_email && <span>From: {r.from_email}</span>}
+                          {r.provider_id && <span>Resend id: {r.provider_id}</span>}
+                        </div>
+                        <div className="rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-neutral-950 p-4">
+                          <div
+                            className="text-sm text-neutral-700 dark:text-neutral-300 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-3 [&_blockquote]:text-neutral-500 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+                            dangerouslySetInnerHTML={{ __html: r.body || "<em>(no body recorded)</em>" }}
+                          />
+                        </div>
                       </div>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
-                      {r.from_email && <span>From: {r.from_email}</span>}
-                      {r.provider_id && <span>Resend id: {r.provider_id}</span>}
-                    </div>
-                    <div className="rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-neutral-950 p-4">
-                      <div
-                        className="text-sm text-neutral-700 dark:text-neutral-300 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-3 [&_blockquote]:text-neutral-500 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
-                        dangerouslySetInnerHTML={{ __html: r.body || "<em>(no body recorded)</em>" }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
             );
           })}
         </div>

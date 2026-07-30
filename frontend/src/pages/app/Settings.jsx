@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertTriangle, Shield, CreditCard, Check, PhoneCall, Loader2, Clock, Mail, Sparkles } from "lucide-react";
+import { Stagger, StaggerItem } from "@/components/app/motion";
 import { settingsApi, followupApi, aiEmailsApi } from "@/lib/backend";
 import { toast } from "sonner";
 
@@ -44,10 +45,10 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="automation">
-          <div className="space-y-6">
-            <AutoCallSettings />
-            <FollowupSettings />
-          </div>
+          <Stagger className="space-y-6" stagger={0.1}>
+            <StaggerItem><AutoCallSettings /></StaggerItem>
+            <StaggerItem><FollowupSettings /></StaggerItem>
+          </Stagger>
         </TabsContent>
 
         <TabsContent value="organization">

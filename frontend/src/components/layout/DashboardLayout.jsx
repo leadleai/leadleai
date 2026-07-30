@@ -38,7 +38,7 @@ const nav = [
   { label: "Settings", icon: SettingsIcon, path: "/app/settings" },
 ];
 
-function SidebarContent({ onNavigate }) {
+function SidebarContent({ onNavigate, idPrefix = "sb" }) {
   const location = useLocation();
   return (
     <div className="flex h-full flex-col">
@@ -47,23 +47,39 @@ function SidebarContent({ onNavigate }) {
         <span className="font-heading font-bold text-lg tracking-tight uppercase">SaleScale AI</span>
       </Link>
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
-        {nav.map((item) => {
+        {nav.map((item, i) => {
           const active = location.pathname === item.path;
           return (
-            <Link
+            <motion.div
               key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                active
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-white"
-              }`}
+              initial={{ opacity: 0, x: -14 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.04 + i * 0.03, type: "spring", stiffness: 320, damping: 26 }}
             >
-              <item.icon className={`w-[18px] h-[18px] transition-transform duration-200 ${active ? "" : "group-hover:scale-110"}`} />
-              {item.label}
-            </Link>
+              <Link
+                to={item.path}
+                onClick={onNavigate}
+                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
+                  active
+                    ? "text-white dark:text-neutral-900"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={`${idPrefix}-active-pill`}
+                    transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    className="absolute inset-0 rounded-xl bg-neutral-900 dark:bg-white"
+                  />
+                )}
+                {!active && (
+                  <span className="absolute inset-0 rounded-xl bg-neutral-100 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                )}
+                <item.icon className={`relative z-10 w-[18px] h-[18px] transition-transform duration-200 ${active ? "" : "group-hover:scale-110 group-hover:-rotate-6"}`} />
+                <span className="relative z-10">{item.label}</span>
+              </Link>
+            </motion.div>
           );
         })}
       </nav>
@@ -101,10 +117,18 @@ function AIAssistant() {
       <motion.button
         data-testid="ai-assistant-fab"
         onClick={() => setOpen(true)}
-        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-white text-black shadow-lg shadow-black/30 flex items-center justify-center"
+        initial={{ scale: 0, rotate: -90 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ delay: 0.4, type: "spring", stiffness: 380, damping: 18 }}
+        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+        className="group fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-white text-black shadow-lg shadow-black/30 flex items-center justify-center"
       >
-        <Sparkles className="w-6 h-6" />
+        <motion.span
+          className="absolute inset-0 rounded-full bg-white/60 -z-10"
+          animate={{ scale: [1, 1.6], opacity: [0.5, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+        />
+        <Sparkles className="w-6 h-6 transition-transform duration-500 group-hover:rotate-180" />
       </motion.button>
       <AnimatePresence>
         {open && (
@@ -112,10 +136,10 @@ function AIAssistant() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden"
+            className="fixed bottom-24 right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] shadow-2xl overflow-hidden"
             data-testid="ai-assistant-panel"
           >
-            <div className="flex items-center justify-between px-4 h-14 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 text-foreground">
+            <div className="flex items-center justify-between px-4 h-14 bg-neutral-100 dark:bg-white/[0.02] border-b border-neutral-200 dark:border-white/10 text-foreground">
               <div className="flex items-center gap-2"><Sparkles className="w-5 h-5" /><span className="font-heading font-semibold">AI Assistant</span></div>
               <button data-testid="ai-assistant-close" onClick={() => setOpen(false)}><X className="w-5 h-5" /></button>
             </div>
@@ -126,7 +150,7 @@ function AIAssistant() {
                 </div>
               ))}
             </div>
-            <div className="p-3 border-t border-neutral-200 dark:border-neutral-800 flex gap-2">
+            <div className="p-3 border-t border-neutral-200 dark:border-white/10 flex gap-2">
               <Input data-testid="ai-assistant-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask anything..." className="rounded-xl" />
               <Button data-testid="ai-assistant-send" onClick={send} size="icon" className="rounded-xl bg-white text-black hover:bg-neutral-200 shrink-0"><Send className="w-4 h-4" /></Button>
             </div>
@@ -211,7 +235,7 @@ export default function DashboardLayout() {
     <div className="min-h-screen bg-neutral-50 dark:bg-black text-neutral-900 dark:text-neutral-100 selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-neutral-200 dark:border-white/10 bg-white dark:bg-black z-30">
-        <SidebarContent />
+        <SidebarContent idPrefix="desktop" />
       </aside>
 
       <div className="lg:pl-64">
@@ -224,7 +248,7 @@ export default function DashboardLayout() {
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-64">
               <SheetHeader className="sr-only"><SheetTitle>Navigation</SheetTitle></SheetHeader>
-              <SidebarContent />
+              <SidebarContent idPrefix="mobile" />
             </SheetContent>
           </Sheet>
 
@@ -271,7 +295,9 @@ export default function DashboardLayout() {
 
         <motion.main
           key={location.pathname}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ opacity: 0, y: 24, scale: 0.985, filter: "blur(6px)" }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="p-4 sm:p-6 lg:p-8 pb-24"
         >
           <Outlet />

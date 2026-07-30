@@ -1,17 +1,30 @@
 import { motion } from "framer-motion";
+import { CountUp, RevealHeading, SPRING, SOFT_SPRING } from "@/components/app/motion";
 
 export function PageHeader({ title, subtitle, action, testid }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8" data-testid={testid}
-    >
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8" data-testid={testid}>
       <div>
-        <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">{title}</h1>
-        {subtitle && <p className="text-muted-foreground mt-1.5 text-sm">{subtitle}</p>}
+        <RevealHeading
+          as="h1"
+          text={title}
+          className="font-display text-3xl sm:text-4xl font-semibold tracking-tight leading-tight"
+        />
+        {subtitle && (
+          <motion.p
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.4 }}
+            className="text-muted-foreground mt-1.5 text-sm"
+          >
+            {subtitle}
+          </motion.p>
+        )}
       </div>
-      {action}
-    </motion.div>
+      {action && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
+          {action}
+        </motion.div>
+      )}
+    </div>
   );
 }
 
@@ -19,17 +32,25 @@ export function StatCard({ label, value, delta, icon: Icon, accent = "indigo", i
   const negative = delta && delta.startsWith("-");
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
-      className="group rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 hover:-translate-y-1 hover:border-neutral-900 dark:hover:border-white/30 transition-all duration-300"
+      initial={{ opacity: 0, y: 26, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: index * 0.06, ...SOFT_SPRING }}
+      whileHover={{ y: -6, transition: SPRING }}
+      className="group rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-5 hover:border-neutral-900 dark:hover:border-white/30 hover:shadow-xl hover:shadow-black/5 dark:hover:shadow-white/5 transition-colors duration-300"
       data-testid={`stat-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-black group-hover:scale-110 transition-transform duration-300">
+        <motion.div
+          whileHover={{ rotate: -8, scale: 1.14 }} transition={SPRING}
+          className="w-10 h-10 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-black"
+        >
           {Icon && <Icon className="w-5 h-5" />}
-        </div>
+        </motion.div>
         {delta && <span className={`text-xs font-medium ${negative ? "text-muted-foreground" : "text-neutral-900 dark:text-white"}`}>{delta}</span>}
       </div>
-      <p className="text-3xl font-display font-semibold tracking-tight mt-4">{value}</p>
+      <p className="text-3xl font-display font-semibold tracking-tight mt-4">
+        <CountUp value={value} />
+      </p>
       <p className="text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">{label}</p>
     </motion.div>
   );

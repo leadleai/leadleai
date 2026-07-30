@@ -56,6 +56,12 @@ async function req(path, opts = {}) {
   return data;
 }
 
+// Public, cosmetic visitor-country lookup used by the pricing page to pick a
+// display currency. Never sends auth; frontend falls back to USD on any error.
+export const geoApi = {
+  detect: () => req("/api/geo", { publicRoute: true }),
+};
+
 export const orgApi = {
   me: () => req("/api/org/me"),
   members: () => req("/api/org/members"),
