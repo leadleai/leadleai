@@ -276,12 +276,15 @@ async def insert_email_log(row: Dict[str, Any], *, token: Optional[str] = None) 
 
 
 async def list_email_logs(
-    limit: int = 200, *, token: Optional[str] = None, org_id: Optional[str] = None
+    limit: int = 200, *, token: Optional[str] = None, org_id: Optional[str] = None,
+    lead_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     url = _base_url()
     params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
+    if lead_id:
+        params["lead_id"] = f"eq.{lead_id}"
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.get(f"{url}/rest/v1/email_log", headers=_headers(token), params=params)
     _raise_for_error(resp)
@@ -446,7 +449,8 @@ async def insert_call_log(row: Dict[str, Any], *, token: Optional[str] = None) -
 
 
 async def list_call_logs(
-    limit: int = 200, *, token: Optional[str] = None, org_id: Optional[str] = None
+    limit: int = 200, *, token: Optional[str] = None, org_id: Optional[str] = None,
+    lead_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Newest first, with the lead's name/company embedded via the lead_id FK."""
     url = _base_url()
@@ -457,6 +461,8 @@ async def list_call_logs(
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
+    if lead_id:
+        params["lead_id"] = f"eq.{lead_id}"
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.get(f"{url}/rest/v1/call_log", headers=_headers(token), params=params)
     _raise_for_error(resp)
@@ -467,6 +473,45 @@ async def list_call_logs(
         row["lead_name"] = lead.get("name")
         row["lead_company"] = lead.get("company")
     return rows
+
+
+# ── Lead status-change history (drives the activity timeline) ────────────────
+async def insert_status_history(
+    row: Dict[str, Any], *, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Append one status-transition row. User mode on the request path so the
+    org_isolation RLS policy authorises the write."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.post(
+            f"{url}/rest/v1/lead_status_history",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_status_history(
+    lead_id: str, *, token: Optional[str] = None, org_id: Optional[str] = None,
+    limit: int = 200,
+) -> List[Dict[str, Any]]:
+    """This lead's status transitions, newest first."""
+    url = _base_url()
+    params = {
+        "lead_id": f"eq.{lead_id}",
+        "select": "*",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    }
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.get(
+            f"{url}/rest/v1/lead_status_history", headers=_headers(token), params=params
+        )
+    _raise_for_error(resp)
+    return resp.json()
 
 
 # ── Follow-up drip helpers ───────────────────────────────────────────────────
@@ -505,6 +550,59 @@ async def set_followup_unsubscribed(lead_id: str) -> Optional[Dict[str, Any]]:
             headers=_headers(None, {"Prefer": "return=representation"}),
             params={"id": f"eq.{lead_id}"},
             json={"followup_unsubscribed": True},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+# ── Per-org automation settings (org_settings) ───────────────────────────────
+async def get_org_settings(
+    org_id: str, *, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """This org's settings row, or None if it has none yet. User mode (RLS) on the
+    request path; service mode (explicit org_id) for the background sweeps."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.get(
+            f"{url}/rest/v1/org_settings",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "select": "*", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_all_org_settings() -> List[Dict[str, Any]]:
+    """EVERY org's settings row. Service mode (no user session): the sweeps call
+    this once per pass to resolve settings per-org LIVE, so a dashboard edit is
+    reflected on the very next sweep without any caching or restart."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=20) as http:
+        resp = await http.get(
+            f"{url}/rest/v1/org_settings",
+            headers=_headers(),
+            params={"select": "*", "limit": "100000"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def upsert_org_settings(
+    org_id: str, fields: Dict[str, Any], *, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Insert-or-update this org's single settings row (unique on org_id).
+
+    User mode on the request path so the org_isolation RLS policy is what actually
+    authorises the write — a caller can only ever touch their own org's row. Unset
+    columns keep their table defaults on insert and their stored values on update."""
+    url = _base_url()
+    body = {"org_id": org_id, **fields, "updated_at": _utcnow_iso()}
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.post(
+            f"{url}/rest/v1/org_settings",
+            headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
+            params={"on_conflict": "org_id"},
+            json=body,
         )
     _raise_for_error(resp)
     return _one(resp.json())

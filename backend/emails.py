@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 import followup
+import org_settings
 import supabase_client as sb
 from auth import OrgContext, require_org
 
@@ -104,16 +105,17 @@ async def compose(lead_id: str, ctx: OrgContext = Depends(require_org)):
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
     step = int(lead.get("followup_step") or 0)
-    # Report anything that would block sending (stop conditions + global gate).
-    blocked_pair = followup.lead_block_reason(lead)
-    blocked = blocked_pair[1] if blocked_pair else followup.global_gate()
+    # Report anything that would block sending (stop conditions + this org's gate).
+    blocked_pair = followup.lead_block_reason(lead, cfg.max_followups)
+    blocked = blocked_pair[1] if blocked_pair else followup.org_gate(cfg)
 
     # Same content path as the drip: the org's template with the matched KB entry
     # dropped in (or the AI draft when AI is on). Pre-fills the compose window so
     # the matched content is editable before sending.
     built = await followup.build_followup_content(
-        lead, step, org_id=ctx.org_id, token=ctx.token
+        lead, step, cfg=cfg, org_id=ctx.org_id, token=ctx.token
     )
 
     return ComposeOut(
@@ -122,8 +124,8 @@ async def compose(lead_id: str, ctx: OrgContext = Depends(require_org)):
         to=(lead.get("email") or ""),
         subject=built.subject,
         body=built.body,
-        step=min(step + 1, followup.MAX_FOLLOWUPS),
-        max=followup.MAX_FOLLOWUPS,
+        step=min(step + 1, cfg.max_followups),
+        max=cfg.max_followups,
         blocked=blocked,
         ai_used=built.ai_used,
         kb_matched=built.kb_matched,
@@ -133,7 +135,8 @@ async def compose(lead_id: str, ctx: OrgContext = Depends(require_org)):
 @router.post("/send")
 async def send_custom_email(payload: SendIn, ctx: OrgContext = Depends(require_org)):
     """Send the user's EDITED content. Same guardrails as the drip; logs + advances the step."""
-    reason = followup.global_gate()  # master switch + email configured + quiet hours
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    reason = followup.org_gate(cfg)  # per-org: enabled + email configured + quiet hours
     if reason:
         logger.info("[emails lead=%s] compose blocked: %s", payload.lead_id, reason)
         raise HTTPException(status_code=409, detail=reason)
@@ -145,7 +148,7 @@ async def send_custom_email(payload: SendIn, ctx: OrgContext = Depends(require_o
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    blocked = followup.lead_block_reason(lead)
+    blocked = followup.lead_block_reason(lead, cfg.max_followups)
     if blocked:
         code, message = blocked
         logger.info("[emails lead=%s] compose blocked-%s: %s", payload.lead_id, code, message)
@@ -165,21 +168,22 @@ async def send_custom_email(payload: SendIn, ctx: OrgContext = Depends(require_o
 
     to = str(payload.to)
     html = followup.wrap_html(payload.body, followup.unsubscribe_url(payload.lead_id))
+    max_f = cfg.max_followups
     try:
-        provider_id = await followup.send_via_resend(to, payload.subject, html)
+        provider_id = await followup.send_via_resend(to, payload.subject, html, from_addr=followup.from_for(cfg))
     except Exception as e:
-        logger.error("[emails lead=%s] FAILED custom step %d/%d: %s", payload.lead_id, step + 1, followup.MAX_FOLLOWUPS, e)
+        logger.error("[emails lead=%s] FAILED custom step %d/%d: %s", payload.lead_id, step + 1, max_f, e)
         await followup.log_email(org_id=ctx.org_id, lead_id=payload.lead_id, to_email=to,
                                  subject=payload.subject, body=payload.body, status="failed",
                                  error=str(e), step=str(step + 1), token=ctx.token)
         raise HTTPException(status_code=502, detail=f"send failed: {e}")
 
     logger.info("[emails lead=%s] SENT custom step %d/%d to %s (resend_id=%s)",
-                payload.lead_id, step + 1, followup.MAX_FOLLOWUPS, to, provider_id or "?")
+                payload.lead_id, step + 1, max_f, to, provider_id or "?")
     await followup.log_email(org_id=ctx.org_id, lead_id=payload.lead_id, to_email=to,
                              subject=payload.subject, body=payload.body, status="sent",
                              step=str(step + 1), provider_id=provider_id, token=ctx.token)
-    return {"sent": True, "step": step + 1, "max": followup.MAX_FOLLOWUPS, "provider_id": provider_id}
+    return {"sent": True, "step": step + 1, "max": max_f, "provider_id": provider_id}
 
 
 # ── Template editing ─────────────────────────────────────────────────────────

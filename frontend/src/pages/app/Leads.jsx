@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download } from "lucide-react";
+import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,7 +155,13 @@ export default function Leads() {
                 className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 hover:bg-neutral-50 dark:hover:bg-white/[0.03] transition-colors" data-testid={`lead-row-${lead.id}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-medium">{lead.name}</h3>
+                    <Link
+                      to={`/app/leads/${lead.id}`}
+                      data-testid={`lead-open-${lead.id}`}
+                      className="font-medium hover:underline underline-offset-4 decoration-neutral-400"
+                    >
+                      {lead.name}
+                    </Link>
                     {lead.company && <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-xs text-neutral-600 dark:text-neutral-300">{lead.company}</span>}
                     <Badge className={`rounded-full font-medium ${meta.cls}`}>{meta.label}</Badge>
                     {lead.auto_called_at && (
@@ -184,6 +191,13 @@ export default function Leads() {
                 </div>
 
                 <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <Link
+                    to={`/app/leads/${lead.id}`}
+                    data-testid={`lead-view-${lead.id}`}
+                    className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-neutral-900 dark:hover:text-white transition-colors"
+                  >
+                    View timeline <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                   <CallButton lead={lead} />
                   <FollowupButton lead={lead} onSent={load} />
                   <select

@@ -27,19 +27,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-import ai_email  # optional grounded AI generation (behind AI_EMAILS_ENABLED)
-import auto_call  # reuse the existing quiet-hours window
+import ai_email  # optional grounded AI generation (behind ai_emails_enabled)
 import kb_match   # rule-based keyword matching (default; no AI, no network)
+import org_settings  # per-org, live settings (schedule, from-email, quiet hours, flags)
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
+from org_settings import ResolvedSettings
 
 logger = logging.getLogger("followup")
 router = APIRouter(prefix="/api/followup", tags=["followup"])
 settings_router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-# Hours after created_at for each step. Hard cap = len(...) = 3.
-FOLLOWUP_SCHEDULE_HOURS = [0.02, 0.04, 0.06]
-MAX_FOLLOWUPS = len(FOLLOWUP_SCHEDULE_HOURS)
+# Hard cap on follow-up steps — there are exactly three editable templates. The
+# per-step TIMING is now per-org and live (org_settings.followup_schedule_hours);
+# this constant only bounds how many steps can ever exist.
+MAX_FOLLOWUPS = org_settings.MAX_FOLLOWUP_STEPS
 # They engaged — stop nudging.
 STOP_STATUSES = {"closed", "meeting_booked", "interested"}
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -113,7 +115,16 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 def interval_minutes() -> int:
+    """Legacy env default only. The live cadence is per-org
+    (org_settings.followup_sweep_seconds); see desired_loop_seconds()."""
     return _env_int("FOLLOWUP_INTERVAL_MINUTES", 1)
 
 
@@ -145,6 +156,55 @@ def set_enabled(value: bool) -> bool:
     global _enabled
     _enabled = bool(value)
     return _enabled
+
+
+# ── Per-org sweep frequency + adaptive scheduler tick ────────────────────────
+# Same reconciliation as auto_call: a single shared loop can't check an org more
+# often than it ticks, so the loop adapts down to the smallest per-org
+# followup_sweep_seconds (floored by FOLLOWUP_SWEEP_MIN_SECONDS) and each pass
+# only processes an org once its own interval has elapsed. See auto_call.py.
+_org_last_swept: dict = {}
+_desired_loop_seconds = None
+
+
+def _sweep_min_seconds() -> float:
+    return max(1.0, _env_float("FOLLOWUP_SWEEP_MIN_SECONDS", 30.0))
+
+
+def desired_loop_seconds() -> float:
+    """Adaptive tick for scheduler.py, read live each pass. Falls back to the env
+    interval until the first sweep has populated it."""
+    if _desired_loop_seconds is not None:
+        return _desired_loop_seconds
+    return max(_sweep_min_seconds(), float(interval_minutes() * 60))
+
+
+def _recompute_loop_interval(settings_map: dict) -> None:
+    global _desired_loop_seconds
+    floor = _sweep_min_seconds()
+    if settings_map:
+        smallest = min(s.followup_sweep_seconds for s in settings_map.values())
+    else:
+        smallest = float(interval_minutes() * 60)
+    _desired_loop_seconds = max(floor, float(smallest))
+
+
+def _org_is_due(org_id, cfg: ResolvedSettings, now_wall: datetime) -> bool:
+    last = _org_last_swept.get(org_id)
+    if last and (now_wall - last).total_seconds() < cfg.followup_sweep_seconds:
+        return False
+    _org_last_swept[org_id] = now_wall
+    return True
+
+
+def _email_configured_for(cfg: ResolvedSettings) -> bool:
+    """Sending needs the (deployment-level) Resend key AND a from-address, which
+    may be per-org (cfg) or fall back to the env default."""
+    return bool(_resend_key() and (cfg.followup_from_email or _from_email()))
+
+
+def _from_for(cfg: ResolvedSettings) -> str:
+    return cfg.followup_from_email or _from_email()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -255,10 +315,11 @@ class BuiltEmail:
     kb_matched: Optional[str] = None  # title of the matched KB entry, or None
 
 
-async def _ai_email(lead: dict, idx: int, *, org_id, token) -> Optional[Tuple[str, str]]:
-    """The AI path (behind AI_EMAILS_ENABLED). Returns (subject, body) or None on
-    an empty KB / missing key / any error — caller then uses the template path."""
-    if not ai_email.is_enabled():
+async def _ai_email(lead: dict, idx: int, *, cfg: ResolvedSettings, org_id, token) -> Optional[Tuple[str, str]]:
+    """The AI path (behind this org's ai_emails_enabled). Returns (subject, body)
+    or None on an empty KB / missing key / disabled / any error — caller then uses
+    the template path."""
+    if not (cfg.ai_emails_enabled and ai_email.api_configured()):
         return None
     try:
         kb = await sb.get_knowledge_content(org_id=org_id, token=token)
@@ -271,19 +332,21 @@ async def _ai_email(lead: dict, idx: int, *, org_id, token) -> Optional[Tuple[st
     first = (lead.get("name") or "there").strip().split(" ")[0] or "there"
     enquiry = (lead.get("enquiry") or "").strip()
     try:
+        # enabled=True: this org has AI on, even if the process-global env toggle
+        # (ai_email.is_enabled) is off — the org's setting is authoritative here.
         return await ai_email.generate_followup(
-            first_name=first, enquiry=enquiry, step=idx + 1, kb_content=kb
+            first_name=first, enquiry=enquiry, step=idx + 1, kb_content=kb, enabled=True
         )
     except Exception as e:  # defence in depth — generate_followup already guards
         logger.error("ai email: generation raised (org=%s): %s; using template", org_id, e)
         return None
 
 
-async def _match_kb(lead: dict, *, org_id, token) -> Optional[kb_match.MatchResult]:
+async def _match_kb(lead: dict, *, cfg: ResolvedSettings, org_id, token) -> Optional[kb_match.MatchResult]:
     """Rule-based keyword match of the lead's enquiry against the org's KB entries.
     Returns the best match, or None (no keywords hit / matching off / KB unreadable).
     Logs the outcome either way so keywords can be tuned."""
-    if not kb_match.kb_matching_enabled():
+    if not cfg.kb_matching_enabled:
         return None
     try:
         entries = await sb.list_knowledge(org_id=org_id, token=token)
@@ -301,27 +364,32 @@ async def _match_kb(lead: dict, *, org_id, token) -> Optional[kb_match.MatchResu
 
 
 async def build_followup_content(
-    lead: dict, step: int, *, org_id: Optional[str] = None, token: Optional[str] = None
+    lead: dict, step: int, *, cfg: Optional[ResolvedSettings] = None,
+    org_id: Optional[str] = None, token: Optional[str] = None,
 ) -> BuiltEmail:
     """Content for a lead's follow-up at `step` (0-based).
 
-    Two paths, in priority order:
-      1. AI (only when AI_EMAILS_ENABLED + key + KB content) — grounded AI draft.
-      2. Template + rule-based KB matching (the default): the org's template, with
-         the matched entry's content dropped into {kb_answer}, or the plain template
-         when nothing matches. This is also the fallback whenever the AI path misses.
+    Two paths, in priority order (both gated by THIS org's live settings):
+      1. AI (only when the org's ai_emails_enabled + key + KB content) — grounded draft.
+      2. Template + rule-based KB matching (the default, gated by kb_matching_enabled):
+         the org's template with the matched entry's content dropped into {kb_answer},
+         or the plain template when nothing matches / matching is off. Also the
+         fallback whenever the AI path misses.
 
-    Never raises. `body` is an HTML fragment WITHOUT the wrapper/unsubscribe footer —
-    the caller still runs it through wrap_html. Shared by the drip (process_lead) and
-    the compose pre-fill (emails.compose)."""
+    `cfg` is the lead's org settings; when omitted it is resolved from `org_id`
+    (used by the compose pre-fill, which has no cfg in hand). Never raises. `body`
+    is an HTML fragment WITHOUT the wrapper/unsubscribe footer — the caller still
+    runs it through wrap_html."""
+    if cfg is None:
+        cfg = await org_settings.resolve_for_org(org_id, token=token)
     templates = await load_templates(org_id=org_id, token=token)
     idx = min(step, MAX_FOLLOWUPS - 1)
 
-    ai = await _ai_email(lead, idx, org_id=org_id, token=token)
+    ai = await _ai_email(lead, idx, cfg=cfg, org_id=org_id, token=token)
     if ai:
         return BuiltEmail(subject=ai[0], body=ai[1], ai_used=True)
 
-    match = await _match_kb(lead, org_id=org_id, token=token)
+    match = await _match_kb(lead, cfg=cfg, org_id=org_id, token=token)
     kb_answer = match.content if match else None
     subject, body = render_template(templates[idx], lead, kb_answer=kb_answer)
     return BuiltEmail(
@@ -352,11 +420,12 @@ async def log_email(*, org_id, lead_id, to_email, subject, body, status, error=N
         logger.warning("[followup lead=%s] could not write email_log: %s", lead_id, e)
 
 
-def lead_block_reason(lead: dict) -> Optional[Tuple[str, str]]:
-    """Per-lead stop conditions (excludes timing). Returns (code, message) or None."""
+def lead_block_reason(lead: dict, max_followups: int = MAX_FOLLOWUPS) -> Optional[Tuple[str, str]]:
+    """Per-lead stop conditions (excludes timing). Returns (code, message) or None.
+    `max_followups` is this org's step count (defaults to the hard cap)."""
     step = int(lead.get("followup_step") or 0)
-    if step >= MAX_FOLLOWUPS:
-        return ("complete", f"sequence complete ({MAX_FOLLOWUPS}/{MAX_FOLLOWUPS} sent)")
+    if step >= max_followups:
+        return ("complete", f"sequence complete ({max_followups}/{max_followups} sent)")
     status = (lead.get("status") or "").strip()
     if status in STOP_STATUSES:
         return ("status", f"lead status is '{status}' — sequence stopped")
@@ -368,8 +437,8 @@ def lead_block_reason(lead: dict) -> Optional[Tuple[str, str]]:
     return None
 
 
-async def _send_via_resend(to: str, subject: str, html: str) -> str:
-    payload = {"from": _from_email(), "to": [to], "subject": subject, "html": html}
+async def _send_via_resend(to: str, subject: str, html: str, from_addr: Optional[str] = None) -> str:
+    payload = {"from": (from_addr or _from_email()), "to": [to], "subject": subject, "html": html}
     async with httpx.AsyncClient(timeout=20) as http:
         resp = await http.post(
             "https://api.resend.com/emails",
@@ -384,41 +453,50 @@ async def _send_via_resend(to: str, subject: str, html: str) -> str:
         return ""
 
 
-def _global_gate() -> Optional[str]:
-    """Conditions that stop ALL sends. Returns a reason, or None if clear."""
-    if not is_enabled():
-        return "follow-ups are disabled (FOLLOWUP_ENABLED is off)"
-    if not email_configured():
-        return "email not configured (set RESEND_API_KEY and FOLLOWUP_FROM_EMAIL)"
-    if not auto_call.within_allowed_hours(auto_call.now_local()):
-        return (
-            f"outside allowed hours ({auto_call.quiet_start():%H:%M}–"
-            f"{auto_call.quiet_end():%H:%M} {auto_call.tz_name()})"
-        )
+def org_gate(cfg: ResolvedSettings) -> Optional[str]:
+    """Per-org conditions that stop ALL of this org's sends. Reason, or None.
+    Resolved from the org's OWN live settings, so a dashboard change is honoured
+    on the next sweep."""
+    if not cfg.followup_enabled:
+        return "follow-ups are disabled for this org"
+    if not _email_configured_for(cfg):
+        return "email not configured (set RESEND_API_KEY, and a from-email in Settings or env)"
+    if not cfg.within_allowed_hours():
+        return (f"outside allowed hours ({cfg.quiet_start}–{cfg.quiet_end} {cfg.timezone})")
     return None
 
 
 # ── Core: decide + send one lead's next follow-up ────────────────────────────
-async def process_lead(lead: dict, now_utc: datetime, manual: bool = False) -> Tuple[bool, str]:
-    """Returns (sent, message). Assumes the global gate has already passed."""
+async def process_lead(
+    lead: dict, now_utc: datetime, cfg: Optional[ResolvedSettings] = None, manual: bool = False
+) -> Tuple[bool, str]:
+    """Returns (sent, message). Assumes the org gate has already passed. `cfg` is
+    the lead's OWN org settings (schedule, from-email, content flags); resolved
+    from the lead's org_id when omitted (manual path)."""
     lead_id = lead.get("id")
     org_id = lead.get("org_id")  # every downstream write is scoped to the lead's own org
+    if cfg is None:
+        cfg = await org_settings.resolve_for_org(org_id)
     tag = f"[followup lead={lead_id} org={org_id}]"
     step = int(lead.get("followup_step") or 0)
     email = (lead.get("email") or "").strip()
+    schedule = cfg.followup_schedule_hours
+    max_followups = cfg.max_followups
 
-    blocked = lead_block_reason(lead)  # shared with the compose/manual endpoint
+    blocked = lead_block_reason(lead, max_followups)  # shared with the compose/manual endpoint
     if blocked:
         code, message = blocked
         logger.info("%s skipped-%s (%s)", tag, code, message)
         return False, message
 
-    if not manual:  # the sweep respects the schedule; manual sends on demand
+    if not manual:  # the sweep respects THIS org's schedule; manual sends on demand
         created = _parse_dt(lead.get("created_at"))
         if created is None:
             logger.info("%s skipped: unparseable created_at (%r)", tag, lead.get("created_at"))
             return False, "no valid created_at"
-        if now_utc < created + timedelta(hours=FOLLOWUP_SCHEDULE_HOURS[step]):
+        # step is guaranteed < max_followups <= len(schedule) by lead_block_reason.
+        due_hours = schedule[step] if step < len(schedule) else schedule[-1]
+        if now_utc < created + timedelta(hours=due_hours):
             return False, "not due yet"  # quiet: would log every lead every sweep
 
     # Claim the step ATOMICALLY before sending — a restart/race can't double-send.
@@ -427,54 +505,84 @@ async def process_lead(lead: dict, now_utc: datetime, manual: bool = False) -> T
         logger.info("%s skipped: step %d already claimed (race/restart)", tag, step + 1)
         return False, "that step was already sent"
 
-    # Template + rule-based KB match (default); AI draft only if AI_EMAILS_ENABLED.
-    built = await build_followup_content(lead, step, org_id=org_id)
+    # Template + rule-based KB match (default); AI draft only if this org enabled it.
+    built = await build_followup_content(lead, step, cfg=cfg, org_id=org_id)
     subject, body = built.subject, built.body
     html = wrap_html(body, unsubscribe_url(lead_id))
     try:
-        email_id = await _send_via_resend(email, subject, html)
+        email_id = await _send_via_resend(email, subject, html, from_addr=_from_for(cfg))
     except Exception as e:
         # Step stays claimed on purpose: at-most-once (never double-send).
-        logger.error("%s FAILED step %d/%d: %s (step already marked; no retry)", tag, step + 1, MAX_FOLLOWUPS, e)
+        logger.error("%s FAILED step %d/%d: %s (step already marked; no retry)", tag, step + 1, max_followups, e)
         await log_email(org_id=org_id, lead_id=lead_id, to_email=email, subject=subject, body=body,
                         status="failed", error=str(e), step=str(step + 1))
         return False, f"send failed: {e}"
 
     logger.info("%s SENT step %d/%d to %s (resend_id=%s, ai=%s, kb=%s)",
-                tag, step + 1, MAX_FOLLOWUPS, email, email_id or "?",
+                tag, step + 1, max_followups, email, email_id or "?",
                 built.ai_used, built.kb_matched or "none")
     await log_email(org_id=org_id, lead_id=lead_id, to_email=email, subject=subject, body=body,
                     status="sent", step=str(step + 1), provider_id=email_id)
-    return True, f"sent follow-up {step + 1}/{MAX_FOLLOWUPS}"
+    return True, f"sent follow-up {step + 1}/{max_followups}"
 
 
 async def run_followup_sweep() -> dict:
-    """Periodic job: send every due follow-up."""
-    reason = _global_gate()
-    if reason:
-        logger.info("followup sweep skipped: %s", reason)
-        return {"swept": 0, "sent": 0, "reason": reason}
+    """Periodic job: for EACH org, using that org's OWN live settings, send every
+    due follow-up. Settings (enabled, schedule, from-email, quiet hours, content
+    flags, sweep frequency) are read LIVE per pass (resolve_all), so a dashboard
+    edit takes effect on the next sweep with no restart. Every guardrail is
+    preserved and resolved per-org: the atomic step claim, the 3-step cap, stop
+    statuses, and unsubscribe."""
+    summary = {"swept": 0, "sent": 0, "orgs_swept": 0,
+               "skipped": {"gate": 0, "not_due_org": 0}, "reason": None}
+
+    settings_map = await org_settings.resolve_all()
+    _recompute_loop_interval(settings_map)  # adapt the scheduler tick to live values
 
     try:
         leads = await sb.list_leads()
     except sb.SupabaseNotConfigured as e:
         logger.warning("followup sweep skipped: %s", e)
-        return {"swept": 0, "sent": 0, "reason": str(e)}
+        summary["reason"] = str(e)
+        return summary
     except Exception as e:
         logger.exception("followup sweep: could not list leads: %s", e)
-        return {"swept": 0, "sent": 0, "reason": str(e)}
+        summary["reason"] = str(e)
+        return summary
 
     now_utc = datetime.now(timezone.utc)
-    sent = 0
+    from collections import defaultdict
+    by_org: dict = defaultdict(list)
     for lead in leads:
-        try:
-            ok, _ = await process_lead(lead, now_utc, manual=False)
-            if ok:
-                sent += 1
-        except Exception as e:
-            logger.exception("[followup lead=%s] unexpected error: %s", lead.get("id"), e)
-    logger.info("followup sweep done: %d lead(s) checked, %d email(s) sent", len(leads), sent)
-    return {"swept": len(leads), "sent": sent, "reason": None}
+        by_org[lead.get("org_id")].append(lead)
+
+    for org_id, org_leads in by_org.items():
+        cfg = org_settings.for_org_or_default(org_id, settings_map)
+
+        # Per-org sweep frequency: only process this org once its interval elapsed.
+        if not _org_is_due(org_id, cfg, now_utc):
+            summary["skipped"]["not_due_org"] += len(org_leads)
+            continue
+
+        reason = org_gate(cfg)
+        if reason:
+            summary["skipped"]["gate"] += len(org_leads)
+            logger.info("followup sweep: org=%s skipped (%s)", org_id, reason)
+            continue
+
+        summary["orgs_swept"] += 1
+        for lead in org_leads:
+            summary["swept"] += 1
+            try:
+                ok, _ = await process_lead(lead, now_utc, cfg=cfg, manual=False)
+                if ok:
+                    summary["sent"] += 1
+            except Exception as e:
+                logger.exception("[followup lead=%s] unexpected error: %s", lead.get("id"), e)
+
+    logger.info("followup sweep done: %d org(s) swept, %d lead(s) checked, %d email(s) sent",
+                summary["orgs_swept"], summary["swept"], summary["sent"])
+    return summary
 
 
 # ── Scheduling ───────────────────────────────────────────────────────────────
@@ -517,8 +625,10 @@ async def unsubscribe(lead_id: str):
 
 @router.post("/send/{lead_id}")
 async def send_next_followup(lead_id: str, ctx: OrgContext = Depends(require_org)):
-    """Manual 'Send next follow-up' — sends the next step now, still respecting stop conditions."""
-    reason = _global_gate()
+    """Manual 'Send next follow-up' — sends the next step now, still respecting stop
+    conditions and THIS org's live settings (enabled, from-email, quiet hours)."""
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    reason = org_gate(cfg)
     if reason:
         logger.info("[followup lead=%s] manual skipped: %s", lead_id, reason)
         raise HTTPException(status_code=409, detail=reason)
@@ -530,50 +640,58 @@ async def send_next_followup(lead_id: str, ctx: OrgContext = Depends(require_org
         raise HTTPException(status_code=404, detail="Lead not found")
 
     step_before = int(lead.get("followup_step") or 0)
-    sent, message = await process_lead(lead, datetime.now(timezone.utc), manual=True)
+    sent, message = await process_lead(lead, datetime.now(timezone.utc), cfg=cfg, manual=True)
     if not sent:
         raise HTTPException(status_code=409, detail=message)
-    return {"sent": True, "step": step_before + 1, "max": MAX_FOLLOWUPS, "message": message}
+    return {"sent": True, "step": step_before + 1, "max": cfg.max_followups, "message": message}
 
 
 class FollowupToggle(BaseModel):
     enabled: bool
 
 
-def current_settings() -> dict:
+def settings_view(cfg: ResolvedSettings) -> dict:
+    """The legacy GET /api/settings/followup display shape, now built from an org's
+    resolved (live) settings rather than global env vars."""
     return {
-        "enabled": is_enabled(),
-        "email_configured": email_configured(),
-        "from_email": _from_email() or None,
-        "schedule_hours": FOLLOWUP_SCHEDULE_HOURS,
-        "max_followups": MAX_FOLLOWUPS,
-        "interval_minutes": interval_minutes(),
+        "enabled": cfg.followup_enabled,
+        "email_configured": _email_configured_for(cfg),
+        "from_email": _from_for(cfg) or None,
+        "schedule_hours": cfg.followup_schedule_hours,
+        "max_followups": cfg.max_followups,
+        "interval_minutes": round(cfg.followup_sweep_seconds / 60, 2),
         "quiet_hours": {
-            "start": auto_call.quiet_start().strftime("%H:%M"),
-            "end": auto_call.quiet_end().strftime("%H:%M"),
-            "timezone": auto_call.tz_name(),
+            "start": cfg.quiet_start,
+            "end": cfg.quiet_end,
+            "timezone": cfg.timezone,
         },
     }
 
 
 @settings_router.get("/followup")
 async def get_followup_settings(ctx: OrgContext = Depends(require_org)):
-    return current_settings()
+    """Legacy read endpoint, now per-org. The full editor is GET/PATCH /api/org/settings."""
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    return settings_view(cfg)
 
 
 @settings_router.put("/followup")
 async def put_followup_settings(body: FollowupToggle, ctx: OrgContext = Depends(require_org)):
-    # As with auto-call: PROCESS-GLOBAL switch, not per-org. Auth-gated so it
-    # can't be flipped anonymously.
-    set_enabled(body.enabled)
-    logger.info("FOLLOWUP_ENABLED set to %s via Settings API by user %s (org %s)",
-                body.enabled, ctx.user_id, ctx.org_id)
-    return current_settings()
+    """Legacy toggle, now PER-ORG: persists followup_enabled to this org's row so
+    the sweeps honour it live. Superseded by PATCH /api/org/settings."""
+    try:
+        await sb.upsert_org_settings(ctx.org_id, {"followup_enabled": bool(body.enabled)}, token=ctx.token)
+    except Exception as e:
+        raise sb_error(e)
+    logger.info("followup_enabled set to %s for org %s by user %s",
+                body.enabled, ctx.org_id, ctx.user_id)
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    return settings_view(cfg)
 
 
 # ── Public surface reused by the emails module (compose / manual sends) ──────
 # Same send + gate + guardrails as the drip — nothing is duplicated there.
-global_gate = _global_gate
 send_via_resend = _send_via_resend
 from_email = _from_email
 public_base = _public_base
+from_for = _from_for

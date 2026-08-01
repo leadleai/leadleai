@@ -55,15 +55,23 @@ def is_enabled() -> bool:
 
 
 def auto_call_interval_seconds() -> float:
-    """How often the auto-call sweep runs. ~60s, like before."""
-    return max(1.0, _env_float("AUTO_CALL_SWEEP_INTERVAL_SECONDS", 60.0))
+    """How often the auto-call LOOP ticks. This is now ADAPTIVE and per-org aware:
+    auto_call.desired_loop_seconds() returns the smallest per-org
+    auto_call_sweep_seconds seen on the last sweep, floored by
+    AUTO_CALL_SWEEP_MIN_SECONDS. Re-read every pass (see _run_loop), so editing an
+    org's sweep frequency in the dashboard speeds up / slows down the loop within
+    one cycle — no restart. Within each pass, each org is only actually processed
+    once its OWN interval has elapsed, so larger per-org values are honoured too.
+    Honest limit: the loop is shared, so no org is checked more often than this
+    tick, and the tick can't drop below the MIN floor."""
+    return max(1.0, auto_call.desired_loop_seconds())
 
 
 def followup_interval_seconds() -> float:
-    """How often the follow-up drip sweep runs. Reuses the existing
-    FOLLOWUP_INTERVAL_MINUTES knob (surfaced in the follow-up settings API), so
-    the scheduler and the settings page always agree."""
-    return max(1.0, followup.interval_minutes() * 60.0)
+    """How often the follow-up LOOP ticks — adaptive, same design as above via
+    followup.desired_loop_seconds() (smallest per-org followup_sweep_seconds,
+    floored by FOLLOWUP_SWEEP_MIN_SECONDS). Re-read every pass."""
+    return max(1.0, followup.desired_loop_seconds())
 
 
 async def _run_loop(

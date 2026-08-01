@@ -21,6 +21,7 @@ from calls import router as calls_router, log_router as call_log_router
 from auto_call import settings_router
 from crm.router import router as crm_router
 from orgs import router as orgs_router, public_router as public_org_router
+from org_settings import router as org_settings_router
 import followup
 import emails as emails_module
 import ai_email
@@ -104,6 +105,9 @@ app.include_router(analytics_router)
 # the enquiry form uses to render "who am I contacting".
 app.include_router(orgs_router)
 app.include_router(public_org_router)
+# Per-org automation settings (GET/PATCH /api/org/settings). The single source of
+# truth the sweeps read LIVE per-org — replaces the old global env-var settings.
+app.include_router(org_settings_router)
 # Cloud Scheduler → cron sweeps (secured by X-Cron-Secret). Replaces the old
 # in-process background loops so scheduling survives Cloud Run scale-to-zero.
 app.include_router(cron_router)

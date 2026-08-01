@@ -66,19 +66,20 @@ class CallIn(BaseModel):
         return v
 
 
-def _build_task(name, company, enquiry) -> str:
+def _build_task(name, company, enquiry, agent_name=None) -> str:
     who = (name or "the prospect").strip()
+    agent = (agent_name or AGENT_NAME).strip() or AGENT_NAME
     company = f" at {company.strip()}" if company else ""
     enquiry = (enquiry or "(no specific enquiry on file)").strip()
     return f"""
-You are {AGENT_NAME}, a friendly, concise AI sales rep from {COMPANY_NAME}.
+You are {agent}, a friendly, concise AI sales rep from {COMPANY_NAME}.
 You are placing an OUTBOUND follow-up call to {who}{company}.
 
 The reason for this call — their specific enquiry — is:
 "{enquiry}"
 
 How to behave:
-- Greet them by name, say you're {AGENT_NAME} from {COMPANY_NAME}, following up on their enquiry.
+- Greet them by name, say you're {agent} from {COMPANY_NAME}, following up on their enquiry.
 - Answer questions ACCURATELY using ONLY the knowledge base below.
 - Be brief and natural; offer to book a quick demo if they're interested.
 - If asked something not in the knowledge base, say a human will follow up by email. Do not invent facts.
@@ -89,9 +90,10 @@ KNOWLEDGE BASE (answer strictly from this):
 """.strip()
 
 
-async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead_id=None) -> str:
+async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead_id=None, agent_name=None) -> str:
     """Place a Bland call. Returns the call_id, or raises BlandError.
-    Shared by the manual POST /api/call endpoint and the auto-caller."""
+    Shared by the manual POST /api/call endpoint and the auto-caller. `agent_name`
+    is the per-org voice-agent name (falls back to the module default)."""
     api_key = os.environ.get("BLAND_API_KEY")
     if not api_key:
         raise BlandError(503, "Server not configured: set BLAND_API_KEY in backend/.env.")
@@ -100,7 +102,7 @@ async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead
 
     payload = {
         "phone_number": phone,
-        "task": _build_task(name, company, enquiry),
+        "task": _build_task(name, company, enquiry, agent_name),
         "request_data": {"name": name, "company": company, "email": email, "enquiry": enquiry, "leadId": lead_id},
         "voice": VOICE,
         "record": RECORD,
@@ -154,13 +156,13 @@ async def log_call(*, org_id, lead_id, to_phone, status, trigger, call_id=None,
 
 
 async def dial_and_log(*, trigger: str, org_id: str, phone, name=None, email=None,
-                       company=None, enquiry=None, lead_id=None, token=None) -> str:
+                       company=None, enquiry=None, lead_id=None, token=None, agent_name=None) -> str:
     """dial() + a call_log row on BOTH outcomes. Returns the call_id or re-raises
     BlandError, so every existing caller keeps its current error handling."""
     try:
         call_id = await dial(
             phone=phone, name=name, email=email, company=company,
-            enquiry=enquiry, lead_id=lead_id,
+            enquiry=enquiry, lead_id=lead_id, agent_name=agent_name,
         )
     except BlandError as e:
         await log_call(org_id=org_id, lead_id=lead_id, to_phone=phone, status="failed",
@@ -183,11 +185,14 @@ async def place_call(lead: CallIn, ctx: OrgContext = Depends(require_org)):
         if not owned:
             raise HTTPException(status_code=404, detail="Lead not found")
 
+    import org_settings
+    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
     try:
         call_id = await dial_and_log(
             trigger="manual", org_id=ctx.org_id, token=ctx.token,
             phone=lead.phone, name=lead.name, email=lead.email,
             company=lead.company, enquiry=lead.enquiry, lead_id=lead.leadId,
+            agent_name=cfg.agent_name,
         )
     except BlandError as e:
         raise HTTPException(status_code=e.status, detail=e.message)

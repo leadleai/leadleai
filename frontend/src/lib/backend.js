@@ -75,6 +75,10 @@ export const orgApi = {
 
 export const leadsApi = {
   list: () => req("/api/leads"),
+  get: (id) => req(`/api/leads/${id}`),
+  // Merged, newest-first activity timeline for one lead (calls, emails,
+  // status changes, and the original enquiry submission).
+  activity: (id) => req(`/api/leads/${id}/activity`),
   // PUBLIC — the enquiry form has no session. `org_slug` files it under the
   // right tenant; it is a non-secret form identifier, not a credential.
   create: (lead) =>
@@ -88,6 +92,15 @@ export const settingsApi = {
   getAutoCall: () => req("/api/settings/auto-call"),
   setAutoCall: (enabled) =>
     req("/api/settings/auto-call", { method: "PUT", body: JSON.stringify({ enabled }) }),
+};
+
+// Per-org automation settings — the single source of truth the sweeps read live.
+// GET returns the org's resolved settings merged over env defaults + read-only
+// deployment flags; PATCH writes a partial update (only the fields you pass).
+export const orgSettingsApi = {
+  get: () => req("/api/org/settings"),
+  update: (patch) =>
+    req("/api/org/settings", { method: "PATCH", body: JSON.stringify(patch) }),
 };
 
 export const crmApi = {

@@ -157,14 +157,19 @@ def _normalise_body(body: str) -> str:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 async def generate_followup(
-    *, first_name: str, enquiry: str, step: int, kb_content: str
+    *, first_name: str, enquiry: str, step: int, kb_content: str,
+    enabled: Optional[bool] = None,
 ) -> Optional[Tuple[str, str]]:
     """Return (subject, body_html) or None on ANY failure (caller falls back).
 
     Never raises. `step` is 1-based (1/2/3). `kb_content` must be non-empty — the
     caller checks that before calling, but we double-check to stay safe.
+
+    `enabled` lets a PER-ORG caller (the drip) override the process-global toggle:
+    when passed, it decides on/off instead of is_enabled(); a key is still required.
     """
-    if not is_enabled():
+    active = (enabled if enabled is not None else is_enabled())
+    if not active or not api_configured():
         return None
     if not kb_content.strip():
         logger.info("ai email: empty knowledge base; falling back to template")

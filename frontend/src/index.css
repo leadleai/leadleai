@@ -16,6 +16,12 @@ html {
 
 @layer base {
     :root {
+        /* Theme native form controls (date/time pickers, number spinners, the
+           time input's digits + --:-- placeholder) to match the page. Without
+           this, a native <input type="time"> renders with the light UA scheme
+           and, on the dark theme, its glyphs are dark-on-dark — it looks greyed
+           out / disabled even though it's fully editable. */
+        color-scheme: light;
         --background: 0 0% 100%;
         --foreground: 0 0% 4%;
         --card: 0 0% 100%;
@@ -43,6 +49,7 @@ html {
         --radius: 0.75rem;
     }
     .dark {
+        color-scheme: dark;
         --background: 0 0% 0%;
         --foreground: 0 0% 100%;
         --card: 0 0% 4%;
