@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download, ChevronRight } from "lucide-react";
+import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download, ChevronRight, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import CallButton from "@/components/app/CallButton";
 import FollowupButton from "@/components/app/FollowupButton";
-import { leadsApi, crmApi, LEAD_STATUSES, MAX_FOLLOWUPS } from "@/lib/backend";
+import { TagChip } from "@/components/app/LeadTags";
+import { leadsApi, crmApi, tagsApi, LEAD_STATUSES, MAX_FOLLOWUPS } from "@/lib/backend";
 import { toast } from "sonner";
 
 // Monochrome status treatments — meaning is carried by the label + fill/outline
@@ -28,6 +29,8 @@ export default function Leads() {
   const [query, setQuery] = useState("");
   const [crm, setCrm] = useState(null); // { provider, ready }
   const [importing, setImporting] = useState(false);
+  const [orgTags, setOrgTags] = useState([]);
+  const [tagFilter, setTagFilter] = useState(null); // tag id, or null for "all"
 
   const load = useCallback(async () => {
     setState("loading");
@@ -44,6 +47,7 @@ export default function Leads() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { crmApi.status().then(setCrm).catch(() => setCrm(null)); }, []);
+  useEffect(() => { tagsApi.list().then((t) => setOrgTags(Array.isArray(t) ? t : [])).catch(() => setOrgTags([])); }, []);
 
   const importFromCrm = async () => {
     setImporting(true);
@@ -78,11 +82,23 @@ export default function Leads() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter(
-      (l) => l.name?.toLowerCase().includes(q) || l.enquiry?.toLowerCase().includes(q),
-    );
-  }, [leads, query]);
+    return leads.filter((l) => {
+      const matchesQuery = !q ||
+        l.name?.toLowerCase().includes(q) || l.enquiry?.toLowerCase().includes(q);
+      const matchesTag = !tagFilter || (l.tags || []).some((t) => t.id === tagFilter);
+      return matchesQuery && matchesTag;
+    });
+  }, [leads, query, tagFilter]);
+
+  // Only offer tag filters that at least one loaded lead actually carries.
+  const usedTagIds = useMemo(
+    () => new Set(leads.flatMap((l) => (l.tags || []).map((t) => t.id))),
+    [leads],
+  );
+  const filterTags = useMemo(
+    () => orgTags.filter((t) => usedTagIds.has(t.id)),
+    [orgTags, usedTagIds],
+  );
 
   return (
     <div>
@@ -114,6 +130,41 @@ export default function Leads() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <Input data-testid="leads-search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name or enquiry…" className="pl-9 rounded-xl" />
+        </div>
+      )}
+
+      {state === "ready" && filterTags.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5" data-testid="leads-tag-filter">
+          <button
+            onClick={() => setTagFilter(null)}
+            data-testid="leads-tag-filter-all"
+            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              tagFilter === null
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-black"
+                : "border border-neutral-200 dark:border-white/15 text-neutral-600 dark:text-neutral-300 hover:border-neutral-400"
+            }`}
+          >
+            All
+          </button>
+          {filterTags.map((t) => {
+            const active = tagFilter === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTagFilter(active ? null : t.id)}
+                data-testid={`leads-tag-filter-${t.id}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-neutral-900 text-white dark:bg-white dark:text-black"
+                    : "border border-neutral-200 dark:border-white/15 text-neutral-600 dark:text-neutral-300 hover:border-neutral-400"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                {t.name}
+                {active && <X className="w-3 h-3" />}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -188,6 +239,11 @@ export default function Leads() {
                     <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 hover:text-neutral-800 dark:hover:text-neutral-200"><Mail className="w-3 h-3" />{lead.email}</a>
                   </div>
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">{lead.enquiry}</p>
+                  {lead.tags?.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`lead-tags-${lead.id}`}>
+                      {lead.tags.map((t) => <TagChip key={t.id} tag={t} small />)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-start gap-2 sm:items-end">

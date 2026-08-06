@@ -3,12 +3,15 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Mail, Phone as PhoneIcon, Building2, Calendar, Loader2, Inbox,
-  MessageSquare, Flag, CheckCircle2, XCircle, Zap, FileText,
+  MessageSquare, Flag, CheckCircle2, XCircle, Zap, FileText, StickyNote,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/Primitives";
 import CallButton from "@/components/app/CallButton";
 import FollowupButton from "@/components/app/FollowupButton";
+import LeadTags from "@/components/app/LeadTags";
+import LeadNotes from "@/components/app/LeadNotes";
+import LeadCustomFields from "@/components/app/LeadCustomFields";
 import { leadsApi, LEAD_STATUSES } from "@/lib/backend";
 import { toast } from "sonner";
 
@@ -38,6 +41,8 @@ function eventVisual(ev) {
       return { Icon: failed ? XCircle : Mail };
     case "status":
       return { Icon: ev.outcome === "closed" ? CheckCircle2 : Flag };
+    case "note":
+      return { Icon: StickyNote };
     default:
       return { Icon: MessageSquare };
   }
@@ -80,7 +85,8 @@ export default function LeadDetail() {
     setLead((l) => ({ ...l, status })); // optimistic
     try {
       const updated = await leadsApi.updateStatus(lead.id, status);
-      setLead(updated);
+      // The PATCH response doesn't re-embed tags — keep the ones we already have.
+      setLead((l) => ({ ...updated, tags: l.tags || [] }));
       toast.success(`${lead.name} → ${statusLabel(status)}`);
       // A status change is itself a timeline event — refresh the feed.
       leadsApi.activity(id).then((a) => setActivity(Array.isArray(a) ? a : [])).catch(() => {});
@@ -89,6 +95,11 @@ export default function LeadDetail() {
       toast.error(e.message);
     }
   };
+
+  // Notes are also timeline events — refresh the feed when one is added/removed.
+  const refreshActivity = useCallback(() => {
+    leadsApi.activity(id).then((a) => setActivity(Array.isArray(a) ? a : [])).catch(() => {});
+  }, [id]);
 
   const statusMeta = useMemo(() => (lead ? STATUS_META[lead.status] || STATUS_META.new : null), [lead]);
 
@@ -134,6 +145,13 @@ export default function LeadDetail() {
                     </span>
                   )}
                 </div>
+                <div className="mt-3">
+                  <LeadTags
+                    leadId={lead.id}
+                    tags={lead.tags || []}
+                    onChange={(tags) => setLead((l) => ({ ...l, tags }))}
+                  />
+                </div>
                 <div className="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
                   <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-2 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white">
                     <PhoneIcon className="w-4 h-4 shrink-0 text-neutral-400" /> {lead.phone}
@@ -178,6 +196,12 @@ export default function LeadDetail() {
               <p className="mt-1.5 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{lead.enquiry}</p>
             </div>
           </motion.div>
+
+          {/* ── Custom fields (org-defined) ──────────────────────────────── */}
+          <LeadCustomFields leadId={lead.id} />
+
+          {/* ── Notes ────────────────────────────────────────────────────── */}
+          <LeadNotes leadId={lead.id} onChanged={refreshActivity} />
 
           {/* ── Activity timeline ────────────────────────────────────────── */}
           <div data-testid="lead-activity">

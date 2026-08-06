@@ -56,6 +56,32 @@ async function req(path, opts = {}) {
   return data;
 }
 
+// Like req(), but returns the raw response as a Blob (for binary payloads such as
+// voice-preview audio). Carries the same auth + org headers so RLS/auth apply; the
+// provider API key stays server-side behind the FastAPI proxy.
+async function reqBlob(path) {
+  const headers = {};
+  const token = await getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const orgId = localStorage.getItem(ORG_KEY);
+  if (orgId) headers["X-Org-Id"] = orgId;
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { headers });
+  } catch (e) {
+    throw new Error(`Can't reach the backend at ${API_BASE}. Is FastAPI running?`);
+  }
+  if (!res.ok) {
+    let data = null;
+    try { data = await res.json(); } catch { /* not json */ }
+    const err = new Error(extractError(data, res.status));
+    err.status = res.status;
+    throw err;
+  }
+  return res.blob();
+}
+
 // Public, cosmetic visitor-country lookup used by the pricing page to pick a
 // display currency. Never sends auth; frontend falls back to USD on any error.
 export const geoApi = {
@@ -156,6 +182,88 @@ export const emailsApi = {
   getTemplates: () => req("/api/emails/templates"),
   saveTemplates: (items) => req("/api/emails/templates", { method: "PUT", body: JSON.stringify(items) }),
 };
+
+// Lead tags: an org-wide library (list/create/delete) plus per-lead assign/unassign.
+// assign/unassign return the lead's full, updated tag set.
+export const tagsApi = {
+  list: () => req("/api/tags"),
+  create: ({ name, color }) =>
+    req("/api/tags", { method: "POST", body: JSON.stringify({ name, color }) }),
+  remove: (id) => req(`/api/tags/${id}`, { method: "DELETE" }),
+  assign: (leadId, tagId) =>
+    req(`/api/leads/${leadId}/tags`, { method: "POST", body: JSON.stringify({ tag_id: tagId }) }),
+  unassign: (leadId, tagId) =>
+    req(`/api/leads/${leadId}/tags/${tagId}`, { method: "DELETE" }),
+};
+
+// Free-text notes on a lead. Each note carries author_email + created_at.
+export const notesApi = {
+  list: (leadId) => req(`/api/leads/${leadId}/notes`),
+  add: (leadId, body) =>
+    req(`/api/leads/${leadId}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+  remove: (leadId, noteId) =>
+    req(`/api/leads/${leadId}/notes/${noteId}`, { method: "DELETE" }),
+};
+
+// Custom fields: org-defined field DEFINITIONS, plus a lead's VALUES for them.
+// getForLead returns definitions merged with the lead's current value; setForLead
+// writes one value (blank clears it) and returns the merged set again.
+export const customFieldsApi = {
+  listDefs: () => req("/api/custom-fields"),
+  createDef: ({ field_key, label, field_type, options }) =>
+    req("/api/custom-fields", {
+      method: "POST",
+      body: JSON.stringify({ field_key, label, field_type, options }),
+    }),
+  updateDef: (id, { label, options }) =>
+    req(`/api/custom-fields/${id}`, { method: "PATCH", body: JSON.stringify({ label, options }) }),
+  removeDef: (id) => req(`/api/custom-fields/${id}`, { method: "DELETE" }),
+  getForLead: (leadId) => req(`/api/leads/${leadId}/custom-fields`),
+  setForLead: (leadId, defId, value) =>
+    req(`/api/leads/${leadId}/custom-fields/${defId}`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    }),
+};
+
+// Field types an org can choose when defining a custom field.
+export const CUSTOM_FIELD_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "select", label: "Dropdown" },
+];
+
+// AI calling agents: per-org CRUD + the provider's real voice list. A call is
+// placed *as* an agent; the org's default agent drives auto-calls.
+export const agentsApi = {
+  list: () => req("/api/agents"),
+  get: (id) => req(`/api/agents/${id}`),
+  create: (agent) => req("/api/agents", { method: "POST", body: JSON.stringify(agent) }),
+  update: (id, patch) => req(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  remove: (id) => req(`/api/agents/${id}`, { method: "DELETE" }),
+  setDefault: (id) => req(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify({ is_default: true }) }),
+  // Real provider voices for the editor dropdown; degrades to a static fallback.
+  // Response: { provider, supports_preview, voices: [{id, name, description}] }.
+  voices: (provider = "bland") => req(`/api/agents/voices?provider=${encodeURIComponent(provider)}`),
+  // Fetch a REAL audio sample of one voice (Bland's sample API, proxied). Returns a
+  // Blob the caller turns into an object URL to play — no fake audio, ever.
+  voiceSample: (voiceId, provider = "bland") =>
+    reqBlob(`/api/agents/voices/${encodeURIComponent(voiceId)}/sample?provider=${encodeURIComponent(provider)}`),
+};
+
+// Languages offered in the agent editor (Bland speaks many; these are common).
+export const AGENT_LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "en-IN", label: "English (India)" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "hi", label: "Hindi" },
+  { value: "pt", label: "Portuguese" },
+];
 
 export const analyticsApi = {
   summary: (period = "7d") => req(`/api/analytics/summary?period=${encodeURIComponent(period)}`),

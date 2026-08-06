@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertTriangle, Shield, CreditCard, Check } from "lucide-react";
 import AutomationSettings from "@/components/app/AutomationSettings";
+import CustomFieldsSettings from "@/components/app/CustomFieldsSettings";
 import { toast } from "sonner";
 
 const team = [
@@ -22,8 +23,12 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="Manage your workspace, team, and preferences" testid="settings-header" />
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="rounded-full flex-wrap h-auto">
-          {["profile", "automation", "organization", "billing", "team", "security", "notifications"].map((t) => (
-            <TabsTrigger key={t} value={t} data-testid={`settings-tab-${t}`} className="rounded-full capitalize">{t}</TabsTrigger>
+          {[
+            ["profile", "Profile"], ["automation", "Automation"], ["customfields", "Custom fields"],
+            ["organization", "Organization"], ["billing", "Billing"], ["team", "Team"],
+            ["security", "Security"], ["notifications", "Notifications"],
+          ].map(([value, label]) => (
+            <TabsTrigger key={value} value={value} data-testid={`settings-tab-${value}`} className="rounded-full">{label}</TabsTrigger>
           ))}
         </TabsList>
 
@@ -44,6 +49,10 @@ export default function Settings() {
 
         <TabsContent value="automation">
           <AutomationSettings />
+        </TabsContent>
+
+        <TabsContent value="customfields">
+          <CustomFieldsSettings />
         </TabsContent>
 
         <TabsContent value="organization">

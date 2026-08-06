@@ -217,12 +217,17 @@ async def _attempt_call(lead: dict, now: datetime, trigger: str, cfg: ResolvedSe
         return False, "already_called"
 
     # PLACE THE CALL. On failure, release the claim so a later sweep can retry.
+    # Auto-calls run as the org's DEFAULT agent (service mode, no user token); if
+    # the org has no agent yet, fall back to the legacy prompt (cfg.agent_name).
+    import agents
+    agent_settings = await agents.resolve_settings_for_call(org_id=org_id)
     try:
         call_id = await calls.dial_and_log(
             trigger=trigger, org_id=org_id,
             phone=phone, name=lead.get("name"), email=lead.get("email"),
             company=lead.get("company"), enquiry=lead.get("enquiry"), lead_id=lead_id,
-            agent_name=cfg.agent_name,
+            agent_name=(None if agent_settings else cfg.agent_name),
+            agent_settings=agent_settings,
         )
     except calls.BlandError as e:
         await sb.release_auto_call(lead_id, org_id=org_id)

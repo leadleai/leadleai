@@ -26,6 +26,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
+from tags import TagOut
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/leads", tags=["leads"])
@@ -82,6 +83,8 @@ class LeadOut(BaseModel):
     followup_step: int = 0
     last_followup_at: Optional[str] = None
     followup_unsubscribed: bool = False
+    # Tags attached to this lead, embedded by supabase_client via the join table.
+    tags: List[TagOut] = Field(default_factory=list)
 
 
 class StatusUpdate(BaseModel):
@@ -100,7 +103,7 @@ class ActivityEvent(BaseModel):
     its icon/styling off `type` and `outcome`; `meta` carries type-specific
     extras (call_id, step, error, …) without widening the top-level shape."""
     id: str
-    type: str                         # "enquiry" | "call" | "email" | "status"
+    type: str                         # "enquiry" | "call" | "email" | "status" | "note"
     timestamp: Optional[str] = None
     title: str
     detail: Optional[str] = None
@@ -202,6 +205,7 @@ async def get_lead_activity(lead_id: str, ctx: OrgContext = Depends(require_org)
         calls = await sb.list_call_logs(500, token=ctx.token, org_id=ctx.org_id, lead_id=lead_id)
         emails = await sb.list_email_logs(500, token=ctx.token, org_id=ctx.org_id, lead_id=lead_id)
         history = await sb.list_status_history(lead_id, token=ctx.token, org_id=ctx.org_id)
+        notes = await sb.list_lead_notes(lead_id, token=ctx.token, org_id=ctx.org_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -251,6 +255,17 @@ async def get_lead_activity(lead_id: str, ctx: OrgContext = Depends(require_org)
             detail=e.get("subject"),
             outcome=e.get("status"),
             meta={"step": step, "to_email": e.get("to_email"), "error": e.get("error")},
+        ))
+
+    for n in notes:
+        events.append(ActivityEvent(
+            id=f"note-{n['id']}",
+            type="note",
+            timestamp=n.get("created_at"),
+            title="Note added",
+            detail=n.get("body"),
+            outcome="note",
+            meta={"author_user_id": n.get("author_user_id")},
         ))
 
     for h in history:

@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Users, UsersRound, Microscope, Megaphone, Mail, Phone, CalendarClock,
-  Kanban, BarChart3, Workflow, BookOpen, Plug, Settings as SettingsIcon,
+  Kanban, BarChart3, Workflow, BookOpen, Bot, Plug, Settings as SettingsIcon,
   Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Check
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
@@ -33,6 +33,7 @@ const nav = [
   { label: "Meetings", icon: CalendarClock, path: "/app/meetings" },
   { label: "Analytics", icon: BarChart3, path: "/app/analytics" },
   { label: "Automation", icon: Workflow, path: "/app/automation" },
+  { label: "Agents", icon: Bot, path: "/app/agents" },
   { label: "Knowledge Base", icon: BookOpen, path: "/app/knowledge" },
   { label: "Integrations", icon: Plug, path: "/app/integrations" },
   { label: "Settings", icon: SettingsIcon, path: "/app/settings" },

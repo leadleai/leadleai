@@ -26,6 +26,10 @@ import followup
 import emails as emails_module
 import ai_email
 from knowledge import router as knowledge_router
+from tags import router as tags_router, assign_router as lead_tags_router
+from notes import router as notes_router
+from custom_fields import router as custom_fields_router, values_router as lead_custom_fields_router
+from agents import router as agents_router
 from analytics import router as analytics_router
 from cron import router as cron_router
 from geo import router as geo_router
@@ -99,6 +103,16 @@ app.include_router(emails_module.router)
 # Per-org knowledge base (grounds the AI follow-up writer) + its on/off toggle.
 app.include_router(knowledge_router)
 app.include_router(ai_email.settings_router)
+# Lead tags (per-org library + assign/unassign), notes, and custom fields
+# (per-org definitions + per-lead values). All authenticated and org-scoped.
+app.include_router(tags_router)
+app.include_router(lead_tags_router)
+app.include_router(notes_router)
+app.include_router(custom_fields_router)
+app.include_router(lead_custom_fields_router)
+# AI calling agents (per-org CRUD + provider voice list). Calls are placed *as* an
+# agent through the calling adapter (backend/calling/), Bland today.
+app.include_router(agents_router)
 # Org-scoped analytics aggregates for the Dashboard + Analytics pages.
 app.include_router(analytics_router)
 # Organizations + team management (auth required), and the public org lookup

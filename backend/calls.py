@@ -56,6 +56,9 @@ class CallIn(BaseModel):
     company: Optional[str] = None
     enquiry: Optional[str] = None
     leadId: Optional[str] = None
+    # Which agent to call as. Optional: falls back to the org's default agent, then
+    # to the legacy fixed prompt if the org has no agents yet.
+    agentId: Optional[str] = None
 
     @field_validator("phone")
     @classmethod
@@ -90,24 +93,24 @@ KNOWLEDGE BASE (answer strictly from this):
 """.strip()
 
 
-async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead_id=None, agent_name=None) -> str:
-    """Place a Bland call. Returns the call_id, or raises BlandError.
-    Shared by the manual POST /api/call endpoint and the auto-caller. `agent_name`
-    is the per-org voice-agent name (falls back to the module default)."""
+def bland_api_key() -> str:
+    """The server-side Bland key, or raise BlandError(503). Never sent to the browser."""
     api_key = os.environ.get("BLAND_API_KEY")
     if not api_key:
         raise BlandError(503, "Server not configured: set BLAND_API_KEY in backend/.env.")
-    if not E164.match((phone or "").strip()):
+    return api_key
+
+
+async def post_bland_call(payload: dict) -> str:
+    """POST one already-built payload to Bland and return the call_id, or raise
+    BlandError. This is the single low-level Bland entry point: the legacy dial()
+    below and the BlandProviderAdapter both build their own payload and hand it
+    here, so error parsing and the same-number guardrail live in exactly one place."""
+    api_key = bland_api_key()
+    phone = (payload.get("phone_number") or "").strip()
+    if not E164.match(phone):
         raise BlandError(422, "phone must be E.164 with country code, e.g. +919812345678")
 
-    payload = {
-        "phone_number": phone,
-        "task": _build_task(name, company, enquiry, agent_name),
-        "request_data": {"name": name, "company": company, "email": email, "enquiry": enquiry, "leadId": lead_id},
-        "voice": VOICE,
-        "record": RECORD,
-        "max_duration": MAX_DURATION,
-    }
     try:
         async with httpx.AsyncClient(timeout=20) as http:
             resp = await http.post(
@@ -137,6 +140,23 @@ async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead
     raise BlandError(resp.status_code if resp.status_code >= 400 else 502, message)
 
 
+async def dial(*, phone, name=None, email=None, company=None, enquiry=None, lead_id=None, agent_name=None) -> str:
+    """Place a Bland call the LEGACY way (fixed voice + inlined KNOWLEDGE_BASE),
+    returns the call_id or raises BlandError. This is the fallback used when an org
+    has no agent configured yet; agent-driven calls go through the calling adapter
+    instead. `agent_name` is the per-org voice-agent name (falls back to the
+    module default)."""
+    payload = {
+        "phone_number": (phone or "").strip(),
+        "task": _build_task(name, company, enquiry, agent_name),
+        "request_data": {"name": name, "company": company, "email": email, "enquiry": enquiry, "leadId": lead_id},
+        "voice": VOICE,
+        "record": RECORD,
+        "max_duration": MAX_DURATION,
+    }
+    return await post_bland_call(payload)
+
+
 async def log_call(*, org_id, lead_id, to_phone, status, trigger, call_id=None,
                    error=None, token=None) -> None:
     """Record every dial attempt (manual / auto / import) in call_log. Never raises —
@@ -156,14 +176,28 @@ async def log_call(*, org_id, lead_id, to_phone, status, trigger, call_id=None,
 
 
 async def dial_and_log(*, trigger: str, org_id: str, phone, name=None, email=None,
-                       company=None, enquiry=None, lead_id=None, token=None, agent_name=None) -> str:
-    """dial() + a call_log row on BOTH outcomes. Returns the call_id or re-raises
-    BlandError, so every existing caller keeps its current error handling."""
+                       company=None, enquiry=None, lead_id=None, token=None,
+                       agent_name=None, agent_settings=None) -> str:
+    """Place a call + write a call_log row on BOTH outcomes. Returns the call_id or
+    re-raises BlandError, so every existing caller keeps its current error handling.
+
+    When `agent_settings` is given the call is routed through the calling adapter
+    for that agent's provider (Bland today); otherwise it falls back to the legacy
+    dial() so an org with no agent configured still calls exactly as before."""
     try:
-        call_id = await dial(
-            phone=phone, name=name, email=email, company=company,
-            enquiry=enquiry, lead_id=lead_id, agent_name=agent_name,
-        )
+        if agent_settings is not None:
+            import calling  # lazy: calling.bland imports this module
+            adapter = calling.get_adapter(agent_settings.provider)
+            lead = calling.CallLead(
+                name=name, phone=phone, email=email,
+                company=company, enquiry=enquiry, lead_id=lead_id,
+            )
+            call_id = await adapter.place_call(agent_settings, lead)
+        else:
+            call_id = await dial(
+                phone=phone, name=name, email=email, company=company,
+                enquiry=enquiry, lead_id=lead_id, agent_name=agent_name,
+            )
     except BlandError as e:
         await log_call(org_id=org_id, lead_id=lead_id, to_phone=phone, status="failed",
                        trigger=trigger, error=e.message, token=token)
@@ -185,14 +219,23 @@ async def place_call(lead: CallIn, ctx: OrgContext = Depends(require_org)):
         if not owned:
             raise HTTPException(status_code=404, detail="Lead not found")
 
+    # Prefer the chosen agent (or the org default) via the calling adapter; fall
+    # back to the legacy fixed prompt (agent_name only) when the org has no agents.
+    import agents
     import org_settings
-    cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    agent_settings = await agents.resolve_settings_for_call(
+        org_id=ctx.org_id, token=ctx.token, agent_id=lead.agentId
+    )
+    agent_name = None
+    if agent_settings is None:
+        cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+        agent_name = cfg.agent_name
     try:
         call_id = await dial_and_log(
             trigger="manual", org_id=ctx.org_id, token=ctx.token,
             phone=lead.phone, name=lead.name, email=lead.email,
             company=lead.company, enquiry=lead.enquiry, lead_id=lead.leadId,
-            agent_name=cfg.agent_name,
+            agent_name=agent_name, agent_settings=agent_settings,
         )
     except BlandError as e:
         raise HTTPException(status_code=e.status, detail=e.message)

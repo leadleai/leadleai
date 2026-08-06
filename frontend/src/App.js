@@ -37,6 +37,7 @@ import Calls from "@/pages/app/Calls";
 import Meetings from "@/pages/app/Meetings";
 import Analytics from "@/pages/app/Analytics";
 import Automation from "@/pages/app/Automation";
+import Agents from "@/pages/app/Agents";
 import KnowledgeBase from "@/pages/app/KnowledgeBase";
 import Integrations from "@/pages/app/Integrations";
 import Settings from "@/pages/app/Settings";
@@ -86,6 +87,7 @@ function App() {
               <Route path="meetings" element={<Meetings />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="automation" element={<Automation />} />
+              <Route path="agents" element={<Agents />} />
               <Route path="knowledge" element={<KnowledgeBase />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
