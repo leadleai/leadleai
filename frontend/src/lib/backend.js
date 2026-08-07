@@ -90,11 +90,22 @@ export const geoApi = {
 
 export const orgApi = {
   me: () => req("/api/org/me"),
+  // Members: { members:[{id,user_id,name,email,role,created_at,is_you}], can_manage, your_role }
   members: () => req("/api/org/members"),
+  changeRole: (userId, role) =>
+    req(`/api/org/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  removeMember: (userId) => req(`/api/org/members/${userId}`, { method: "DELETE" }),
+  // Invites (owners only). listInvites -> [{id,email,role,token,status,expires_at,...}]
+  invites: () => req("/api/org/invites"),
   invite: (email, role = "member") =>
-    req("/api/org/invite", { method: "POST", body: JSON.stringify({ email, role }) }),
-  revokeInvite: (id) => req(`/api/org/invite/${id}`, { method: "DELETE" }),
-  removeMember: (id) => req(`/api/org/members/${id}`, { method: "DELETE" }),
+    req("/api/org/invites", { method: "POST", body: JSON.stringify({ email, role }) }),
+  revokeInvite: (id) => req(`/api/org/invites/${id}`, { method: "DELETE" }),
+  // Redeem an invite token (any signed-in user whose email matches the invite).
+  acceptInvite: (token) =>
+    req("/api/org/invites/accept", { method: "POST", body: JSON.stringify({ token }) }),
+  // Public: preview an invite link before signing in -> {email, role, org_name, valid, expired}
+  previewInvite: (token) =>
+    req(`/api/public/invite/${encodeURIComponent(token)}`, { publicRoute: true }),
   // Public: lets the enquiry form show whose form it is.
   publicOrg: (slug) => req(`/api/public/org/${encodeURIComponent(slug)}`, { publicRoute: true }),
 };

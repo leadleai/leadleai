@@ -19,8 +19,10 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Send people back where they were headed before the redirect to /login.
-  const from = location.state?.from?.pathname || "/app";
+  // Send people back where they were headed before the redirect to /login,
+  // preserving any query string (e.g. an invite token on /accept-invite).
+  const fromLoc = location.state?.from;
+  const from = fromLoc ? `${fromLoc.pathname}${fromLoc.search || ""}` : "/app";
 
   const submit = async (e) => {
     e.preventDefault();

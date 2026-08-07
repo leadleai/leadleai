@@ -11,6 +11,7 @@ import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
+import AcceptInvite from "@/pages/AcceptInvite";
 import Onboarding from "@/pages/Onboarding";
 import Demo from "@/pages/Demo";
 import Pricing from "@/pages/Pricing";
@@ -60,6 +61,7 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/pricing" element={<Pricing />} />

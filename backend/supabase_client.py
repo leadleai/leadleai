@@ -17,6 +17,7 @@ TWO MODES, and the difference matters for security:
 The service role key lives only in backend/.env and never reaches the browser.
 """
 import os
+import secrets
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -372,6 +373,11 @@ def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _iso_in_days(days: int) -> str:
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+
+
 # ── Knowledge base (per-org, private; grounds the AI follow-up writer) ────────
 async def list_knowledge(
     *, org_id: Optional[str] = None, token: Optional[str] = None
@@ -667,13 +673,15 @@ async def list_org_members(org_id: str, *, token: str) -> List[Dict[str, Any]]:
 
 
 async def list_invites(org_id: str, *, token: str) -> List[Dict[str, Any]]:
+    """This org's still-pending invites, newest first. User mode (RLS)."""
     url = _base_url()
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.get(
             f"{url}/rest/v1/invites",
             headers=_headers(token),
-            params={"org_id": f"eq.{org_id}", "accepted_at": "is.null",
-                    "select": "id,email,role,created_at", "order": "created_at.desc"},
+            params={"org_id": f"eq.{org_id}", "status": "eq.pending",
+                    "select": "id,email,role,token,status,created_at,expires_at",
+                    "order": "created_at.desc"},
         )
     _raise_for_error(resp)
     return resp.json()
@@ -682,25 +690,96 @@ async def list_invites(org_id: str, *, token: str) -> List[Dict[str, Any]]:
 async def create_invite(
     org_id: str, email: str, role: str, invited_by: str, *, token: str
 ) -> Optional[Dict[str, Any]]:
-    """User mode on purpose: the `invite_owner_write` policy rejects this unless
-    the caller is actually an owner of org_id. The DB is the authority, not us."""
+    """Create (or re-open) a pending invite for an email.
+
+    User mode on purpose: the `invite_owner_write` policy rejects this unless the
+    caller is actually an owner of org_id. The DB is the authority, not us.
+
+    Upsert on (org_id, email): re-inviting someone whose invite was accepted or
+    expired flips it back to pending, mints a fresh token, and pushes the expiry
+    out again — so one row per (org, email) is reused rather than duplicated.
+    A brand-new row gets its token + expiry from the column defaults."""
     url = _base_url()
+    row = {
+        "org_id": org_id,
+        "email": email,
+        "role": role,
+        "invited_by": invited_by,
+        "status": "pending",
+        "accepted_at": None,
+        # Re-issue a token + expiry on re-invite. gen_random_bytes lives in the
+        # DB, so we mirror its shape here for the update-path of the upsert.
+        "token": secrets.token_hex(24),
+        "expires_at": _iso_in_days(7),
+    }
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.post(
             f"{url}/rest/v1/invites",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
             params={"on_conflict": "org_id,email"},
-            json={"org_id": org_id, "email": email, "role": role, "invited_by": invited_by},
+            json=row,
         )
     _raise_for_error(resp)
     return _one(resp.json())
 
 
-async def delete_invite(invite_id: str, *, token: str) -> None:
+async def get_invite_by_token(invite_token: str) -> Optional[Dict[str, Any]]:
+    """Look up an invite by its shareable token. Service mode by necessity: the
+    person accepting is NOT yet a member of the org, so RLS would hide the row
+    from their own JWT. The token is an unguessable secret that stands in for
+    that authorisation; the caller still verifies email + status + expiry."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.get(
+            f"{url}/rest/v1/invites",
+            headers=_headers(),
+            params={"token": f"eq.{invite_token}",
+                    "select": "id,org_id,email,role,status,expires_at,"
+                              "organization:organizations(id,name,slug)",
+                    "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def is_org_member(org_id: str, user_id: str) -> bool:
+    """Whether a user already belongs to an org. Service mode: used by the invite
+    accept to stay idempotent when the signup trigger already joined them."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.get(
+            f"{url}/rest/v1/memberships",
+            headers=_headers(),
+            params={"org_id": f"eq.{org_id}", "user_id": f"eq.{user_id}",
+                    "select": "id", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return bool(resp.json())
+
+
+async def mark_invite_accepted(invite_id: str) -> Optional[Dict[str, Any]]:
+    """Flag an invite accepted after a successful token redemption. Service mode:
+    paired with get_invite_by_token / add_membership_service in the accept flow."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/invites",
+            headers=_headers(None, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{invite_id}"},
+            json={"status": "accepted", "accepted_at": _utcnow_iso()},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def delete_invite(invite_id: str, org_id: str, *, token: str) -> None:
+    """Revoke (hard-delete) a pending invite. org_id is scoped in the params too
+    so a stray id can't reach outside the caller's org even before RLS."""
     url = _base_url()
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.delete(
-            f"{url}/rest/v1/invites", headers=_headers(token), params={"id": f"eq.{invite_id}"}
+            f"{url}/rest/v1/invites", headers=_headers(token),
+            params={"id": f"eq.{invite_id}", "org_id": f"eq.{org_id}"},
         )
     _raise_for_error(resp)
 
@@ -719,11 +798,49 @@ async def add_membership(org_id: str, user_id: str, role: str, *, token: str) ->
     return _one(resp.json())
 
 
-async def remove_membership(membership_id: str, *, token: str) -> None:
+async def add_membership_service(org_id: str, user_id: str, role: str) -> Optional[Dict[str, Any]]:
+    """Add a user to an org WITHOUT an owner session. Service mode: used by the
+    token-based invite accept, where the person joining is not yet a member and
+    so has no RLS authorisation to insert their own membership. Authorisation
+    comes from having redeemed a valid invite token, checked by the caller."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.post(
+            f"{url}/rest/v1/memberships",
+            headers=_headers(None, {"Prefer": "resolution=merge-duplicates,return=representation"}),
+            params={"on_conflict": "org_id,user_id"},
+            json={"org_id": org_id, "user_id": user_id, "role": role},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def update_member_role(
+    org_id: str, user_id: str, role: str, *, token: str
+) -> Optional[Dict[str, Any]]:
+    """Change a member's role. User mode: `membership_owner_write` authorises it
+    only for owners. The last-owner trigger (migration 0016) rejects demoting the
+    sole owner at the database level regardless of what we do here."""
+    url = _base_url()
+    async with httpx.AsyncClient(timeout=15) as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/memberships",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params={"org_id": f"eq.{org_id}", "user_id": f"eq.{user_id}"},
+            json={"role": role},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def remove_membership(org_id: str, user_id: str, *, token: str) -> None:
+    """Remove a member from an org by (org_id, user_id). User mode: owner-only via
+    RLS; the last-owner trigger blocks removing the sole owner at the DB level."""
     url = _base_url()
     async with httpx.AsyncClient(timeout=15) as http:
         resp = await http.delete(
-            f"{url}/rest/v1/memberships", headers=_headers(token), params={"id": f"eq.{membership_id}"}
+            f"{url}/rest/v1/memberships", headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "user_id": f"eq.{user_id}"},
         )
     _raise_for_error(resp)
 
