@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Loader2, MailCheck } from "lucide-react";
 import AuthShell, { GoogleButton, ConfigWarning } from "./AuthShell";
+import OtpForm from "./OtpForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Signup() {
   const navigate = useNavigate();
   const { signUp, configured } = useAuth();
+  const [method, setMethod] = useState("password"); // "password" | "otp"
   const [form, setForm] = useState({ email: "", password: "" });
   const [terms, setTerms] = useState(true);
   const [errors, setErrors] = useState({});
@@ -72,6 +74,36 @@ export default function Signup() {
     );
   }
 
+  if (method === "otp") {
+    return (
+      <AuthShell title="Start your free trial" subtitle="Sign up with a one-time code — no password to remember">
+        <ConfigWarning configured={configured} />
+        <OtpForm testidPrefix="signup-otp" createUser={true}
+          onVerified={() => {
+            // Same as password signup: the DB trigger provisions the org + owner
+            // membership on the new auth.users row.
+            toast.success("Account created — welcome!");
+            navigate("/app", { replace: true });
+          }} />
+
+        <div className="relative py-2 mt-4">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-neutral-200 dark:border-neutral-800" /></div>
+          <span className="relative mx-auto block w-fit bg-white dark:bg-neutral-950 px-3 text-xs text-neutral-400">OR</span>
+        </div>
+
+        <Button type="button" variant="outline" data-testid="signup-use-password"
+          onClick={() => setMethod("password")} className="w-full h-11 rounded-full">
+          Sign up with a password instead
+        </Button>
+
+        <p className="text-center text-sm text-neutral-500 mt-4">
+          Already have an account?{" "}
+          <Link to="/login" data-testid="to-login" className="text-neutral-300 font-medium hover:underline">Log in</Link>
+        </p>
+      </AuthShell>
+    );
+  }
+
   return (
     <AuthShell title="Start your free trial" subtitle="14 days free. No credit card required.">
       <ConfigWarning configured={configured} />
@@ -108,6 +140,11 @@ export default function Signup() {
         </div>
 
         <GoogleButton testid="signup-google" label="Sign up with Google" />
+
+        <Button type="button" variant="outline" data-testid="signup-use-otp"
+          onClick={() => setMethod("otp")} className="w-full h-11 rounded-xl">
+          Email me a code instead
+        </Button>
 
         <p className="text-center text-sm text-neutral-500 mt-4">
           Already have an account?{" "}

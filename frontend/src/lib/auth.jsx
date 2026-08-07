@@ -84,6 +84,26 @@ export function AuthProvider({ children }) {
     return { needsConfirmation: !data.session };
   }, []);
 
+  // Passwordless email OTP. Supabase emails a 6-digit code; verifyOtp exchanges
+  // it for the SAME kind of session (ES256 JWT) as password/Google login, so the
+  // signup trigger, org scoping, JWKS verification and RLS all apply unchanged.
+  const signInWithOtp = useCallback(async (email, { createUser = true } = {}) => {
+    if (!supabase) throw new Error("Auth is not configured (missing Supabase env vars).");
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      // On the login page we don't want a typo to silently mint a new account;
+      // on signup we do. Callers pass createUser accordingly.
+      options: { shouldCreateUser: createUser },
+    });
+    if (error) throw new Error(error.message);
+  }, []);
+
+  const verifyOtp = useCallback(async (email, token) => {
+    if (!supabase) throw new Error("Auth is not configured (missing Supabase env vars).");
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+    if (error) throw new Error(error.message);
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) throw new Error("Auth is not configured (missing Supabase env vars).");
     const { error } = await supabase.auth.signInWithOAuth({
@@ -128,11 +148,12 @@ export function AuthProvider({ children }) {
       orgs,
       orgError,
       isOwner: org?.role === "owner",
-      signIn, signUp, signInWithGoogle, resetPassword, updatePassword, signOut,
+      signIn, signUp, signInWithOtp, verifyOtp, signInWithGoogle,
+      resetPassword, updatePassword, signOut,
       switchOrg, reloadOrg: loadOrg,
     }),
-    [loading, session, org, orgs, orgError, signIn, signUp, signInWithGoogle,
-     resetPassword, updatePassword, signOut, switchOrg, loadOrg]
+    [loading, session, org, orgs, orgError, signIn, signUp, signInWithOtp, verifyOtp,
+     signInWithGoogle, resetPassword, updatePassword, signOut, switchOrg, loadOrg]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

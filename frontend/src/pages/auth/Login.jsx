@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import AuthShell, { GoogleButton, ConfigWarning } from "./AuthShell";
+import OtpForm from "./OtpForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn, configured } = useAuth();
+  const [method, setMethod] = useState("password"); // "password" | "otp"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
@@ -44,6 +46,31 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (method === "otp") {
+    return (
+      <AuthShell title="Welcome back" subtitle="We'll email you a one-time code — no password needed">
+        <ConfigWarning configured={configured} />
+        <OtpForm testidPrefix="login-otp" createUser={false}
+          onVerified={() => { toast.success("Welcome back!"); navigate(from, { replace: true }); }} />
+
+        <div className="relative py-2 mt-4">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-neutral-200 dark:border-neutral-800" /></div>
+          <span className="relative mx-auto block w-fit bg-white dark:bg-neutral-950 px-3 text-xs text-neutral-400">OR</span>
+        </div>
+
+        <Button type="button" variant="outline" data-testid="login-use-password"
+          onClick={() => setMethod("password")} className="w-full h-11 rounded-full">
+          Use password instead
+        </Button>
+
+        <p className="text-center text-sm text-neutral-500 mt-4">
+          Don&apos;t have an account?{" "}
+          <Link to="/signup" data-testid="to-signup" className="text-neutral-300 font-medium hover:underline">Sign up</Link>
+        </p>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to your LeadPilot workspace">
@@ -82,6 +109,11 @@ export default function Login() {
         </div>
 
         <GoogleButton testid="login-google" />
+
+        <Button type="button" variant="outline" data-testid="login-use-otp"
+          onClick={() => setMethod("otp")} className="w-full h-11 rounded-xl">
+          Email me a code
+        </Button>
 
         <p className="text-center text-sm text-neutral-500 mt-4">
           Don&apos;t have an account?{" "}
