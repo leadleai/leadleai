@@ -33,7 +33,7 @@ export default function HowItWorks() {
           <div className="relative max-w-5xl mx-auto px-6 sm:px-8">
             <AnimatedKicker className="font-mono text-[11px] uppercase tracking-[0.3em] text-neutral-500">How it works</AnimatedKicker>
             <AnimatedHeading as="h1" text="One AI employee. The entire sales cycle." delay={0.05}
-              className="font-display text-5xl sm:text-7xl font-semibold tracking-tight leading-[0.95] mt-5 max-w-3xl" />
+              className="font-display text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02] sm:leading-[0.95] mt-5 max-w-3xl break-words" />
             <Reveal delay={0.25} className="mt-6 text-lg text-neutral-400 font-light max-w-2xl leading-relaxed">
               From a cold list to a booked meeting — here is exactly what happens after you connect SaleScale AI.
             </Reveal>

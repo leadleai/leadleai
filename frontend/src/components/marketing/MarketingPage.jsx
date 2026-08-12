@@ -20,7 +20,7 @@ export default function MarketingPage({ title, subtitle, kicker, children, testi
               as="h1"
               text={title}
               delay={0.05}
-              className="font-display text-5xl sm:text-7xl font-semibold tracking-tight leading-[0.98] mt-5"
+              className="font-display text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02] sm:leading-[0.98] mt-5 break-words"
             />
             {subtitle && (
               <Reveal delay={0.25} className="mt-6 text-lg text-neutral-400 font-light max-w-2xl leading-relaxed">

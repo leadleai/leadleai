@@ -41,9 +41,9 @@ export default function Landing() {
           <div className="absolute inset-0 bw-grid opacity-50" />
           <div className="bw-noise absolute inset-0 opacity-[0.05] pointer-events-none" />
           <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[85%] h-[560px] bg-white/[0.07] blur-[130px] rounded-full" />
-          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center w-full">
+          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center w-full">
             {/* Left */}
-            <div>
+            <div className="min-w-0">
               <motion.div
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-4 py-1.5 mb-8"
@@ -55,7 +55,7 @@ export default function Landing() {
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-300">Autonomous sales, on autopilot</span>
               </motion.div>
 
-              <h1 className="font-display text-[13vw] sm:text-7xl lg:text-8xl font-semibold tracking-tight leading-[0.92]">
+              <h1 className="font-display text-[clamp(2.5rem,11vw,3.25rem)] sm:text-7xl lg:text-8xl font-semibold tracking-tight leading-[0.95] sm:leading-[0.92] break-words">
                 <AnimatedHeading as="span" text="Your AI Sales Team" className="block" />
                 <span className="block">
                   <AnimatedHeading as="span" text="That" delay={0.2} className="inline" />{" "}
@@ -93,7 +93,7 @@ export default function Landing() {
 
             {/* Right — portrait + rotating halo */}
             <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-              className="relative hidden lg:block h-[640px]">
+              className="relative block min-w-0 h-[420px] sm:h-[520px] lg:h-[640px]">
               <div className="absolute top-6 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full border border-dashed border-white/20 animate-spin-slow" />
               <div className="absolute top-10 left-1/2 -translate-x-1/2 w-60 h-60 rounded-full border-[10px] border-white/80 blur-[2px] animate-halo"
                 style={{ boxShadow: "0 0 70px 14px rgba(255,255,255,0.35)" }} />
@@ -105,12 +105,12 @@ export default function Landing() {
               </div>
               {/* floating stat chips */}
               <motion.div animate={{ y: [0, -12, 0] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute bottom-16 -left-4 rounded-2xl border border-white/15 bg-black/80 backdrop-blur px-4 py-3">
+                className="absolute bottom-6 left-2 sm:bottom-16 lg:-left-4 rounded-2xl border border-white/15 bg-black/80 backdrop-blur px-4 py-3">
                 <p className="font-display text-2xl font-semibold">3.2×</p>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Pipeline growth</p>
               </motion.div>
               <motion.div animate={{ y: [0, 12, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-24 -right-2 rounded-2xl border border-white/15 bg-black/80 backdrop-blur px-4 py-3">
+                className="absolute top-6 right-2 sm:top-24 lg:-right-2 rounded-2xl border border-white/15 bg-black/80 backdrop-blur px-4 py-3">
                 <p className="font-display text-2xl font-semibold">24/7</p>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Always working</p>
               </motion.div>

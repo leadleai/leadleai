@@ -38,7 +38,7 @@ export default function Demo() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[70%] h-[420px] bg-white/[0.06] blur-[120px] rounded-full" />
         <div className="relative max-w-5xl mx-auto px-6 sm:px-8 text-center">
           <AnimatedKicker className="font-mono text-[11px] uppercase tracking-[0.3em] text-neutral-500">Product Demo</AnimatedKicker>
-          <h1 className="font-display text-5xl sm:text-7xl font-semibold tracking-tight mt-4 leading-[0.95]">
+          <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight mt-4 leading-[1.02] sm:leading-[0.95] break-words">
             <AnimatedHeading as="span" text="See SaleScale AI" className="inline" />{" "}
             <span className="font-display-italic font-normal bw-shine">in action.</span>
           </h1>
