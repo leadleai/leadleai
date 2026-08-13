@@ -74,10 +74,16 @@ class CallingProviderAdapter(ABC):
         """Whether the adapter can place a call (credentials/config present)."""
 
     @abstractmethod
-    async def place_call(self, agent_settings: AgentSettings, lead: CallLead) -> str:
+    async def place_call(
+        self, agent_settings: AgentSettings, lead: CallLead, *, api_key: Optional[str] = None
+    ) -> str:
         """Place a call as ``agent_settings`` to ``lead``. Returns the provider's
         call id, or raises (CallingNotConfigured when not ready; a provider error
-        otherwise)."""
+        otherwise).
+
+        ``api_key`` is the calling ORG's own provider key (from their connection);
+        when None the adapter falls back to the deployment-wide env key, so
+        first-party testing works with no connection configured."""
 
     @abstractmethod
     async def list_voices(self) -> List[Voice]:

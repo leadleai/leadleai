@@ -106,10 +106,11 @@ async def compose(lead_id: str, ctx: OrgContext = Depends(require_org)):
         raise HTTPException(status_code=404, detail="Lead not found")
 
     cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
+    creds = await followup.resolve_resend(cfg, org_id=ctx.org_id, token=ctx.token)
     step = int(lead.get("followup_step") or 0)
     # Report anything that would block sending (stop conditions + this org's gate).
     blocked_pair = followup.lead_block_reason(lead, cfg.max_followups)
-    blocked = blocked_pair[1] if blocked_pair else followup.org_gate(cfg)
+    blocked = blocked_pair[1] if blocked_pair else followup.org_gate(cfg, creds)
 
     # Same content path as the drip: the org's template with the matched KB entry
     # dropped in (or the AI draft when AI is on). Pre-fills the compose window so
@@ -136,7 +137,9 @@ async def compose(lead_id: str, ctx: OrgContext = Depends(require_org)):
 async def send_custom_email(payload: SendIn, ctx: OrgContext = Depends(require_org)):
     """Send the user's EDITED content. Same guardrails as the drip; logs + advances the step."""
     cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
-    reason = followup.org_gate(cfg)  # per-org: enabled + email configured + quiet hours
+    # This org's own Resend key + from-email (their connection, or env fallback).
+    creds = await followup.resolve_resend(cfg, org_id=ctx.org_id, token=ctx.token)
+    reason = followup.org_gate(cfg, creds)  # per-org: enabled + email configured + quiet hours
     if reason:
         logger.info("[emails lead=%s] compose blocked: %s", payload.lead_id, reason)
         raise HTTPException(status_code=409, detail=reason)
@@ -170,19 +173,21 @@ async def send_custom_email(payload: SendIn, ctx: OrgContext = Depends(require_o
     html = followup.wrap_html(payload.body, followup.unsubscribe_url(payload.lead_id))
     max_f = cfg.max_followups
     try:
-        provider_id = await followup.send_via_resend(to, payload.subject, html, from_addr=followup.from_for(cfg))
+        provider_id = await followup.send_via_resend(
+            to, payload.subject, html, from_addr=creds.from_email, api_key=creds.api_key
+        )
     except Exception as e:
         logger.error("[emails lead=%s] FAILED custom step %d/%d: %s", payload.lead_id, step + 1, max_f, e)
         await followup.log_email(org_id=ctx.org_id, lead_id=payload.lead_id, to_email=to,
                                  subject=payload.subject, body=payload.body, status="failed",
-                                 error=str(e), step=str(step + 1), token=ctx.token)
+                                 error=str(e), step=str(step + 1), token=ctx.token, from_email=creds.from_email)
         raise HTTPException(status_code=502, detail=f"send failed: {e}")
 
     logger.info("[emails lead=%s] SENT custom step %d/%d to %s (resend_id=%s)",
                 payload.lead_id, step + 1, max_f, to, provider_id or "?")
     await followup.log_email(org_id=ctx.org_id, lead_id=payload.lead_id, to_email=to,
                              subject=payload.subject, body=payload.body, status="sent",
-                             step=str(step + 1), provider_id=provider_id, token=ctx.token)
+                             step=str(step + 1), provider_id=provider_id, token=ctx.token, from_email=creds.from_email)
     return {"sent": True, "step": step + 1, "max": max_f, "provider_id": provider_id}
 
 

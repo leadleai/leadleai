@@ -220,7 +220,10 @@ async def _attempt_call(lead: dict, now: datetime, trigger: str, cfg: ResolvedSe
     # Auto-calls run as the org's DEFAULT agent (service mode, no user token); if
     # the org has no agent yet, fall back to the legacy prompt (cfg.agent_name).
     import agents
+    import connections
     agent_settings = await agents.resolve_settings_for_call(org_id=org_id)
+    # Resolve THIS org's own Bland key (service mode — no user session); None -> env.
+    org_bland_key = await connections.resolve_bland_key(org_id)
     try:
         call_id = await calls.dial_and_log(
             trigger=trigger, org_id=org_id,
@@ -228,6 +231,7 @@ async def _attempt_call(lead: dict, now: datetime, trigger: str, cfg: ResolvedSe
             company=lead.get("company"), enquiry=lead.get("enquiry"), lead_id=lead_id,
             agent_name=(None if agent_settings else cfg.agent_name),
             agent_settings=agent_settings,
+            bland_api_key=org_bland_key,
         )
     except calls.BlandError as e:
         await sb.release_auto_call(lead_id, org_id=org_id)

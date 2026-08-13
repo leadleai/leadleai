@@ -16,6 +16,7 @@ import {
 import { integrations as defaults } from "@/lib/mockData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { oauthApi, backendConfigured, PLATFORM_BY_NAME } from "@/lib/api";
+import ProviderConnections from "@/components/app/ProviderConnections";
 import { toast } from "sonner";
 
 const iconMap = { Chrome, Building2, Slack, Magnet, Cloud, GitBranch, Circle, Phone, Sparkles, Brain, Linkedin, Webhook, Database };
@@ -125,6 +126,10 @@ export default function Integrations() {
           </Button>
         }
       />
+
+      {/* Real, per-org provider accounts (Bland calling + Resend email) — bring
+          your own encrypted API keys. The grid below stays a demo showcase. */}
+      <ProviderConnections />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {items.map((it, i) => {

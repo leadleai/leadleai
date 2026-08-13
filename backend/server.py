@@ -17,6 +17,7 @@ load_dotenv(ROOT_DIR / '.env')
 import db as mongo
 import supabase_client as sb  # shared HTTP client; closed on shutdown
 from integrations.router import router as integrations_router
+from connections import router as connections_router
 from leads import router as leads_router
 from lead_import import router as lead_import_router
 from calls import router as calls_router, log_router as call_log_router
@@ -88,6 +89,8 @@ async def get_status_checks():
 app.include_router(api_router)
 # OAuth2 integrations (authorize / callback / list / disconnect) under /api/integrations
 app.include_router(integrations_router)
+# Per-org PROVIDER connections: each org's own encrypted Bland/Resend API keys.
+app.include_router(connections_router)
 # Inbound leads (Supabase-backed) and outbound Bland calls.
 app.include_router(leads_router)
 # Excel/CSV lead import (upload -> preview/map -> confirm).

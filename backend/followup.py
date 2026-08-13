@@ -401,14 +401,16 @@ async def build_followup_content(
 
 
 async def log_email(*, org_id, lead_id, to_email, subject, body, status, error=None,
-                    step=None, provider_id=None, token=None) -> None:
-    """Record every send attempt (auto OR manual) in email_log. Never raises."""
+                    step=None, provider_id=None, token=None, from_email=None) -> None:
+    """Record every send attempt (auto OR manual) in email_log. Never raises.
+    `from_email` is the address actually sent from (the org's connection sender, or
+    the env fallback); defaults to the env from-email when not provided."""
     try:
         await sb.insert_email_log({
             "org_id": org_id,
             "lead_id": lead_id,
             "to_email": to_email,
-            "from_email": _from_email() or None,
+            "from_email": from_email or _from_email() or None,
             "subject": subject,
             "body": body,
             "status": status,
@@ -437,12 +439,18 @@ def lead_block_reason(lead: dict, max_followups: int = MAX_FOLLOWUPS) -> Optiona
     return None
 
 
-async def _send_via_resend(to: str, subject: str, html: str, from_addr: Optional[str] = None) -> str:
+async def _send_via_resend(
+    to: str, subject: str, html: str, from_addr: Optional[str] = None, api_key: Optional[str] = None
+) -> str:
+    """Send one email through Resend. `api_key` is the sending ORG's own Resend key
+    (from their connection); `from_addr` is their verified sender. Both fall back to
+    the deployment-wide env values when None, so first-party testing still works."""
     payload = {"from": (from_addr or _from_email()), "to": [to], "subject": subject, "html": html}
+    key = (api_key or "").strip() or _resend_key()
     async with httpx.AsyncClient(timeout=20) as http:
         resp = await http.post(
             "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {_resend_key()}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json=payload,
         )
     if resp.status_code >= 400:
@@ -453,14 +461,58 @@ async def _send_via_resend(to: str, subject: str, html: str, from_addr: Optional
         return ""
 
 
-def org_gate(cfg: ResolvedSettings) -> Optional[str]:
+@dataclass
+class ResendCreds:
+    """The effective Resend credentials for one org: their own key + from-email when
+    they've connected Resend, else the deployment-wide env fallback."""
+    api_key: Optional[str]
+    from_email: Optional[str]
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.api_key and self.from_email)
+
+
+async def resolve_resend(
+    cfg: Optional[ResolvedSettings], *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> ResendCreds:
+    """Resolve the Resend key + from-email to use for an org, in priority order:
+      api_key    : org connection  → env RESEND_API_KEY
+      from_email : org connection  → org_settings.followup_from_email → env FOLLOWUP_FROM_EMAIL
+    Never raises: a lookup failure falls back to env so a send is never dropped on
+    an unreadable connection."""
+    org_id = org_id or (cfg.org_id if cfg else None)
+    conn = None
+    if org_id:
+        try:
+            import connections  # lazy: avoids an import cycle at module load
+            conn = await connections.resolve_resend(org_id, token=token)
+        except Exception as e:
+            logger.warning("org=%s could not resolve Resend connection (%s); using env", org_id, e)
+            conn = None
+    api_key = (conn or {}).get("api_key") or _resend_key() or None
+    from_email = (
+        (conn or {}).get("from_email")
+        or (cfg.followup_from_email if cfg else None)
+        or _from_email()
+        or None
+    )
+    return ResendCreds(api_key=api_key, from_email=from_email)
+
+
+def org_gate(cfg: ResolvedSettings, creds: Optional["ResendCreds"] = None) -> Optional[str]:
     """Per-org conditions that stop ALL of this org's sends. Reason, or None.
     Resolved from the org's OWN live settings, so a dashboard change is honoured
-    on the next sweep."""
+    on the next sweep.
+
+    When `creds` is given, "email configured" means THAT org has a usable Resend
+    key + from-email (their own connection OR the env fallback). When omitted we
+    fall back to the deployment-level env check for back-compat."""
     if not cfg.followup_enabled:
         return "follow-ups are disabled for this org"
-    if not _email_configured_for(cfg):
-        return "email not configured (set RESEND_API_KEY, and a from-email in Settings or env)"
+    configured = creds.configured if creds is not None else _email_configured_for(cfg)
+    if not configured:
+        return "email not configured (connect Resend in Connections, or set RESEND_API_KEY + a from-email)"
     if not cfg.within_allowed_hours():
         return (f"outside allowed hours ({cfg.quiet_start}–{cfg.quiet_end} {cfg.timezone})")
     return None
@@ -468,15 +520,20 @@ def org_gate(cfg: ResolvedSettings) -> Optional[str]:
 
 # ── Core: decide + send one lead's next follow-up ────────────────────────────
 async def process_lead(
-    lead: dict, now_utc: datetime, cfg: Optional[ResolvedSettings] = None, manual: bool = False
+    lead: dict, now_utc: datetime, cfg: Optional[ResolvedSettings] = None, manual: bool = False,
+    creds: Optional[ResendCreds] = None,
 ) -> Tuple[bool, str]:
     """Returns (sent, message). Assumes the org gate has already passed. `cfg` is
     the lead's OWN org settings (schedule, from-email, content flags); resolved
-    from the lead's org_id when omitted (manual path)."""
+    from the lead's org_id when omitted (manual path). `creds` is the lead's org's
+    resolved Resend key + from-email (their connection, or env fallback); resolved
+    here when omitted so the send always uses the right org's account."""
     lead_id = lead.get("id")
     org_id = lead.get("org_id")  # every downstream write is scoped to the lead's own org
     if cfg is None:
         cfg = await org_settings.resolve_for_org(org_id)
+    if creds is None:
+        creds = await resolve_resend(cfg, org_id=org_id)
     tag = f"[followup lead={lead_id} org={org_id}]"
     step = int(lead.get("followup_step") or 0)
     email = (lead.get("email") or "").strip()
@@ -510,19 +567,21 @@ async def process_lead(
     subject, body = built.subject, built.body
     html = wrap_html(body, unsubscribe_url(lead_id))
     try:
-        email_id = await _send_via_resend(email, subject, html, from_addr=_from_for(cfg))
+        email_id = await _send_via_resend(
+            email, subject, html, from_addr=creds.from_email, api_key=creds.api_key
+        )
     except Exception as e:
         # Step stays claimed on purpose: at-most-once (never double-send).
         logger.error("%s FAILED step %d/%d: %s (step already marked; no retry)", tag, step + 1, max_followups, e)
         await log_email(org_id=org_id, lead_id=lead_id, to_email=email, subject=subject, body=body,
-                        status="failed", error=str(e), step=str(step + 1))
+                        status="failed", error=str(e), step=str(step + 1), from_email=creds.from_email)
         return False, f"send failed: {e}"
 
     logger.info("%s SENT step %d/%d to %s (resend_id=%s, ai=%s, kb=%s)",
                 tag, step + 1, max_followups, email, email_id or "?",
                 built.ai_used, built.kb_matched or "none")
     await log_email(org_id=org_id, lead_id=lead_id, to_email=email, subject=subject, body=body,
-                    status="sent", step=str(step + 1), provider_id=email_id)
+                    status="sent", step=str(step + 1), provider_id=email_id, from_email=creds.from_email)
     return True, f"sent follow-up {step + 1}/{max_followups}"
 
 
@@ -568,7 +627,10 @@ async def run_followup_sweep() -> dict:
             summary["skipped"]["not_due_org"] += len(org_leads)
             continue
 
-        reason = org_gate(cfg)
+        # Resolve this org's own Resend key + from-email ONCE per pass (service
+        # mode — the sweep has no user session), then gate and send with it.
+        creds = await resolve_resend(cfg, org_id=org_id)
+        reason = org_gate(cfg, creds)
         if reason:
             summary["skipped"]["gate"] += len(org_leads)
             logger.info("followup sweep: org=%s skipped (%s)", org_id, reason)
@@ -578,7 +640,7 @@ async def run_followup_sweep() -> dict:
         for lead in org_leads:
             summary["swept"] += 1
             try:
-                ok, _ = await process_lead(lead, now_utc, cfg=cfg, manual=False)
+                ok, _ = await process_lead(lead, now_utc, cfg=cfg, manual=False, creds=creds)
                 if ok:
                     summary["sent"] += 1
             except Exception as e:
@@ -632,7 +694,8 @@ async def send_next_followup(lead_id: str, ctx: OrgContext = Depends(require_org
     """Manual 'Send next follow-up' — sends the next step now, still respecting stop
     conditions and THIS org's live settings (enabled, from-email, quiet hours)."""
     cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
-    reason = org_gate(cfg)
+    creds = await resolve_resend(cfg, org_id=ctx.org_id, token=ctx.token)
+    reason = org_gate(cfg, creds)
     if reason:
         logger.info("[followup lead=%s] manual skipped: %s", lead_id, reason)
         raise HTTPException(status_code=409, detail=reason)
@@ -644,7 +707,7 @@ async def send_next_followup(lead_id: str, ctx: OrgContext = Depends(require_org
         raise HTTPException(status_code=404, detail="Lead not found")
 
     step_before = int(lead.get("followup_step") or 0)
-    sent, message = await process_lead(lead, datetime.now(timezone.utc), cfg=cfg, manual=True)
+    sent, message = await process_lead(lead, datetime.now(timezone.utc), cfg=cfg, manual=True, creds=creds)
     if not sent:
         raise HTTPException(status_code=409, detail=message)
     return {"sent": True, "step": step_before + 1, "max": cfg.max_followups, "message": message}
@@ -654,13 +717,17 @@ class FollowupToggle(BaseModel):
     enabled: bool
 
 
-def settings_view(cfg: ResolvedSettings) -> dict:
+def settings_view(cfg: ResolvedSettings, creds: Optional["ResendCreds"] = None) -> dict:
     """The legacy GET /api/settings/followup display shape, now built from an org's
-    resolved (live) settings rather than global env vars."""
+    resolved (live) settings rather than global env vars. When `creds` is given the
+    configured/from-email fields reflect the org's Resend CONNECTION (their own key)
+    rather than only the deployment env."""
+    email_configured = creds.configured if creds is not None else _email_configured_for(cfg)
+    from_email = (creds.from_email if creds is not None else _from_for(cfg)) or None
     return {
         "enabled": cfg.followup_enabled,
-        "email_configured": _email_configured_for(cfg),
-        "from_email": _from_for(cfg) or None,
+        "email_configured": email_configured,
+        "from_email": from_email,
         "schedule_hours": cfg.followup_schedule_hours,
         "max_followups": cfg.max_followups,
         "interval_minutes": round(cfg.followup_sweep_seconds / 60, 2),
@@ -676,7 +743,8 @@ def settings_view(cfg: ResolvedSettings) -> dict:
 async def get_followup_settings(ctx: OrgContext = Depends(require_org)):
     """Legacy read endpoint, now per-org. The full editor is GET/PATCH /api/org/settings."""
     cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
-    return settings_view(cfg)
+    creds = await resolve_resend(cfg, org_id=ctx.org_id, token=ctx.token)
+    return settings_view(cfg, creds)
 
 
 @settings_router.put("/followup")
@@ -690,7 +758,8 @@ async def put_followup_settings(body: FollowupToggle, ctx: OrgContext = Depends(
     logger.info("followup_enabled set to %s for org %s by user %s",
                 body.enabled, ctx.org_id, ctx.user_id)
     cfg = await org_settings.resolve_for_org(ctx.org_id, token=ctx.token)
-    return settings_view(cfg)
+    creds = await resolve_resend(cfg, org_id=ctx.org_id, token=ctx.token)
+    return settings_view(cfg, creds)
 
 
 # ── Public surface reused by the emails module (compose / manual sends) ──────

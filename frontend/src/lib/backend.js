@@ -215,6 +215,21 @@ export const integrationsApi = {
   disconnect: (platform) => req(`/api/integrations/${platform}`, { method: "DELETE" }),
 };
 
+// Per-org PROVIDER connections: each org's OWN Bland (calling) and Resend (email)
+// API keys, stored ENCRYPTED server-side. The browser only ever SENDS a key to be
+// saved — GET returns a masked hint (e.g. "re_…cd12"), never the full key.
+//   list   -> [{ service, connected, masked_key, from_email, is_active, updated_at }]
+//   save   -> { service, api_key, from_email? }  (from_email required for Resend)
+export const connectionsApi = {
+  list: () => req("/api/connections"),
+  save: ({ service, api_key, from_email }) =>
+    req("/api/connections", {
+      method: "POST",
+      body: JSON.stringify({ service, api_key, ...(from_email ? { from_email } : {}) }),
+    }),
+  remove: (service) => req(`/api/connections/${service}`, { method: "DELETE" }),
+};
+
 export const knowledgeApi = {
   list: () => req("/api/knowledge"),
   create: ({ title, content, keywords }) =>

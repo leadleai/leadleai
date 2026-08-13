@@ -1046,6 +1046,70 @@ async def delete_integration_token(org_id: str, platform: str, *, token: Optiona
     _raise_for_error(resp)
 
 
+# ── Per-org provider connections (Bland / Resend API keys, encrypted) ─────────
+# Distinct from integration_tokens (OAuth). encrypted_credentials is Fernet
+# ciphertext produced by the backend; the raw key never reaches this layer as
+# plaintext beyond the moment of encryption in connections.py.
+async def list_connections(org_id: str, *, token: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Non-secret columns only — never selects encrypted_credentials, so a masked
+    view is all the request path can ever build. User mode (RLS) on the request path."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/connections",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}",
+                    "select": "service,key_hint,from_email,is_active,created_at,updated_at",
+                    "order": "service.asc"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def get_connection(
+    org_id: str, service: str, *, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Full row INCLUDING encrypted_credentials. Used server-side only — by the
+    call/email paths resolving an org's own key. Service mode (explicit org_id) for
+    the background sweeps; user mode when a token is passed on the request path."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/connections",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "service": f"eq.{service}",
+                    "select": "*", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def upsert_connection(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Insert-or-update one org's connection for a service (unique on org_id,service).
+    User mode on the request path so the org_isolation RLS policy authorises it."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/connections",
+            headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
+            params={"on_conflict": "org_id,service"},
+            json={**row, "updated_at": _utcnow_iso()},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def delete_connection(org_id: str, service: str, *, token: Optional[str] = None) -> None:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.delete(
+            f"{url}/rest/v1/connections",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "service": f"eq.{service}"},
+        )
+    _raise_for_error(resp)
+
+
 # ── Lead tags (per-org library + many-to-many assignments) ────────────────────
 # All USER mode on the request path: RLS (org_isolation) is what actually scopes
 # every read and write to the caller's org.

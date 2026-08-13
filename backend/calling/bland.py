@@ -20,7 +20,7 @@ the browser and never stored per-org here.
 """
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 import httpx
 
@@ -86,9 +86,14 @@ class BlandProviderAdapter(CallingProviderAdapter):
     def is_ready(self) -> bool:
         return bool(os.environ.get("BLAND_API_KEY"))
 
-    async def place_call(self, agent_settings: AgentSettings, lead: CallLead) -> str:
+    async def place_call(
+        self, agent_settings: AgentSettings, lead: CallLead, *, api_key: Optional[str] = None
+    ) -> str:
         """Translate the agent + lead into a Bland payload and place the call via
-        calls.post_bland_call (shared guardrails). Returns the Bland call_id."""
+        calls.post_bland_call (shared guardrails). Returns the Bland call_id.
+
+        `api_key` is the org's own Bland key (from their connection); it is passed
+        straight through to the Bland POST so their account is charged. None -> env."""
         payload = {
             "phone_number": (lead.phone or "").strip(),
             "task": _build_task(agent_settings, lead),
@@ -113,7 +118,7 @@ class BlandProviderAdapter(CallingProviderAdapter):
             for k, v in extra.items():
                 payload.setdefault(k, v)
 
-        return await calls.post_bland_call(payload)
+        return await calls.post_bland_call(payload, api_key=api_key)
 
     async def list_voices(self) -> List[Voice]:
         """Bland's real preset voices (GET /v1/voices). Falls back to a small
