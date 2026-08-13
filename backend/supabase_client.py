@@ -286,6 +286,36 @@ async def find_lead(
     return _one(resp.json())
 
 
+async def find_lead_by_contact(
+    phone: Optional[str], email: Optional[str], *, org_id: str, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Find an existing lead in THIS org by phone OR email — for file-import dedupe.
+    Always org-scoped: two tenants may legitimately hold the same contact. At least
+    one of phone/email must be a non-empty value, else there is nothing to match on
+    and we return None (the caller treats it as 'no duplicate')."""
+    phone = (phone or "").strip()
+    email = (email or "").strip()
+    clauses = []
+    if phone:
+        clauses.append(f"phone.eq.{phone}")
+    if email:
+        clauses.append(f"email.eq.{email}")
+    if not clauses:
+        return None
+
+    url = _base_url()
+    if len(clauses) == 1:
+        field, value = clauses[0].split(".eq.", 1)
+        params = {field: f"eq.{value}"}
+    else:
+        params = {"or": f"({','.join(clauses)})"}
+    params.update({"org_id": f"eq.{org_id}", "select": "id,status", "limit": "1"})
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
 async def update_lead_fields(
     lead_id: str, fields: Dict[str, Any], *, org_id: Optional[str] = None, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:

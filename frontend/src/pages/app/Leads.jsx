@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download, ChevronRight, X } from "lucide-react";
+import { Search, Mail, Phone as PhoneIcon, RefreshCw, Inbox, Loader2, AlertTriangle, Zap, Download, ChevronRight, X, Upload } from "lucide-react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import CallButton from "@/components/app/CallButton";
 import FollowupButton from "@/components/app/FollowupButton";
+import ImportLeadsDialog from "@/components/app/ImportLeadsDialog";
 import { TagChip } from "@/components/app/LeadTags";
 import { leadsApi, crmApi, tagsApi, LEAD_STATUSES, MAX_FOLLOWUPS } from "@/lib/backend";
 import { toast } from "sonner";
+
+// Human labels for the `source` a lead came in through.
+const SOURCE_META = {
+  inbound: "Inbound form",
+  import: "File import",
+  crm: "CRM",
+};
 
 // Monochrome status treatments — meaning is carried by the label + fill/outline
 // weight (solid = fresh/actionable, outline = in-progress, muted = done), no hue.
@@ -31,6 +39,8 @@ export default function Leads() {
   const [importing, setImporting] = useState(false);
   const [orgTags, setOrgTags] = useState([]);
   const [tagFilter, setTagFilter] = useState(null); // tag id, or null for "all"
+  const [sourceFilter, setSourceFilter] = useState(null); // source string, or null for "all"
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -86,9 +96,16 @@ export default function Leads() {
       const matchesQuery = !q ||
         l.name?.toLowerCase().includes(q) || l.enquiry?.toLowerCase().includes(q);
       const matchesTag = !tagFilter || (l.tags || []).some((t) => t.id === tagFilter);
-      return matchesQuery && matchesTag;
+      const matchesSource = !sourceFilter || (l.source || "inbound") === sourceFilter;
+      return matchesQuery && matchesTag && matchesSource;
     });
-  }, [leads, query, tagFilter]);
+  }, [leads, query, tagFilter, sourceFilter]);
+
+  // Sources present across the loaded leads (for the filter chips).
+  const usedSources = useMemo(
+    () => Array.from(new Set(leads.map((l) => l.source || "inbound"))).sort(),
+    [leads],
+  );
 
   // Only offer tag filters that at least one loaded lead actually carries.
   const usedTagIds = useMemo(
@@ -114,6 +131,10 @@ export default function Leads() {
                 CRM: {crm.provider}{crm.ready ? "" : " · not ready"}
               </Badge>
             )}
+            <Button data-testid="import-file-btn" variant="outline" onClick={() => setImportOpen(true)}
+              className="rounded-full">
+              <Upload className="w-4 h-4 mr-1" /> Import from file
+            </Button>
             <Button data-testid="crm-import-btn" onClick={importFromCrm} disabled={importing}
               className="rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
               {importing ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importing…</> : <><Download className="w-4 h-4 mr-1" /> Import from CRM</>}
@@ -130,6 +151,41 @@ export default function Leads() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <Input data-testid="leads-search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name or enquiry…" className="pl-9 rounded-xl" />
+        </div>
+      )}
+
+      {state === "ready" && usedSources.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5" data-testid="leads-source-filter">
+          <span className="text-xs text-muted-foreground mr-1">Source:</span>
+          <button
+            onClick={() => setSourceFilter(null)}
+            data-testid="leads-source-filter-all"
+            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              sourceFilter === null
+                ? "bg-neutral-900 text-white dark:bg-white dark:text-black"
+                : "border border-neutral-200 dark:border-white/15 text-neutral-600 dark:text-neutral-300 hover:border-neutral-400"
+            }`}
+          >
+            All
+          </button>
+          {usedSources.map((s) => {
+            const active = sourceFilter === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setSourceFilter(active ? null : s)}
+                data-testid={`leads-source-filter-${s}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-neutral-900 text-white dark:bg-white dark:text-black"
+                    : "border border-neutral-200 dark:border-white/15 text-neutral-600 dark:text-neutral-300 hover:border-neutral-400"
+                }`}
+              >
+                {SOURCE_META[s] || s}
+                {active && <X className="w-3 h-3" />}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -215,6 +271,10 @@ export default function Leads() {
                     </Link>
                     {lead.company && <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-xs text-neutral-600 dark:text-neutral-300">{lead.company}</span>}
                     <Badge className={`rounded-full font-medium ${meta.cls}`}>{meta.label}</Badge>
+                    <span data-testid={`lead-source-${lead.id}`}
+                      className="inline-flex items-center rounded-full border border-neutral-200 dark:border-white/15 bg-transparent px-2 py-0.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                      {SOURCE_META[lead.source] || lead.source || "Inbound form"}
+                    </span>
                     {lead.auto_called_at && (
                       <span data-testid={`lead-autocalled-${lead.id}`}
                         title={lead.call_id ? `Bland call ${lead.call_id}` : undefined}
@@ -272,6 +332,8 @@ export default function Leads() {
           })}
         </div>
       )}
+
+      <ImportLeadsDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
     </div>
   );
 }

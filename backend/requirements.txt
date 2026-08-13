@@ -27,5 +27,9 @@ itsdangerous>=2.2.0
 python-dotenv>=1.0.1
 tzdata>=2024.2
 
+# ── Spreadsheet lead import — lightweight, pure-Python parsers (no pandas/numpy)
+openpyxl>=3.1.2                   # .xlsx/.xlsm, read in streaming read-only mode
+xlrd>=2.0.1                       # legacy .xls (BIFF) only
+
 # ── Optional MongoDB — only imported/connected if MONGO_URL is set (see db.py)
 motor==3.3.1

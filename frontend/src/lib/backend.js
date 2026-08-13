@@ -82,6 +82,36 @@ async function reqBlob(path) {
   return res.blob();
 }
 
+// Like req(), but sends a multipart/form-data body (file uploads). We must NOT
+// set Content-Type ourselves — the browser adds it with the correct multipart
+// boundary. Same auth + org headers so the backend verifies the JWT and RLS applies.
+async function upload(path, formData) {
+  const headers = {};
+  const token = await getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const orgId = localStorage.getItem(ORG_KEY);
+  if (orgId) headers["X-Org-Id"] = orgId;
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  } catch (e) {
+    throw new Error(`Can't reach the backend at ${API_BASE}. Is FastAPI running?`);
+  }
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* no body */
+  }
+  if (!res.ok) {
+    const err = new Error(extractError(data, res.status));
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 // Public, cosmetic visitor-country lookup used by the pricing page to pick a
 // display currency. Never sends auth; frontend falls back to USD on any error.
 export const geoApi = {
@@ -123,7 +153,30 @@ export const leadsApi = {
   updateStatus: (id, status) =>
     req(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   call: (lead) => req("/api/call", { method: "POST", body: JSON.stringify(lead) }),
+  // File import (Excel/CSV). Two steps: preview to detect columns + suggest a
+  // mapping, then confirm with the file + the chosen column->field mapping.
+  importFilePreview: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return upload("/api/leads/import-file", fd);
+  },
+  importFileConfirm: (file, mapping) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("mapping", JSON.stringify(mapping));
+    return upload("/api/leads/import-file/confirm", fd);
+  },
 };
+
+// The lead fields a spreadsheet column can be mapped onto (mirrors the backend
+// IMPORT_FIELDS). `required` drives the "map at least one of these" hint.
+export const IMPORT_FIELDS = [
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "company", label: "Company" },
+  { key: "enquiry", label: "Enquiry" },
+];
 
 export const settingsApi = {
   getAutoCall: () => req("/api/settings/auto-call"),

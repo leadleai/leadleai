@@ -18,6 +18,7 @@ import db as mongo
 import supabase_client as sb  # shared HTTP client; closed on shutdown
 from integrations.router import router as integrations_router
 from leads import router as leads_router
+from lead_import import router as lead_import_router
 from calls import router as calls_router, log_router as call_log_router
 from auto_call import settings_router
 from crm.router import router as crm_router
@@ -89,6 +90,8 @@ app.include_router(api_router)
 app.include_router(integrations_router)
 # Inbound leads (Supabase-backed) and outbound Bland calls.
 app.include_router(leads_router)
+# Excel/CSV lead import (upload -> preview/map -> confirm).
+app.include_router(lead_import_router)
 app.include_router(calls_router)
 # Call history (call_log), newest first.
 app.include_router(call_log_router)
