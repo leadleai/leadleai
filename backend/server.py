@@ -15,6 +15,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 # Optional MongoDB (see db.py) — disabled unless MONGO_URL is set.
 import db as mongo
+import supabase_client as sb  # shared HTTP client; closed on shutdown
 from integrations.router import router as integrations_router
 from leads import router as leads_router
 from calls import router as calls_router, log_router as call_log_router
@@ -169,6 +170,8 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    # Stop the sweep loops first so they don't run mid-teardown, then close Mongo.
+    # Stop the sweep loops first so they don't run mid-teardown, then close the
+    # shared Supabase HTTP client and Mongo.
     await scheduler.stop()
+    await sb.aclose()
     mongo.close()

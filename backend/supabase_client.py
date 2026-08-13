@@ -16,11 +16,60 @@ TWO MODES, and the difference matters for security:
 
 The service role key lives only in backend/.env and never reaches the browser.
 """
+import contextlib
 import os
 import secrets
 from typing import Any, Dict, List, Optional
 
 import httpx
+
+
+# ── Shared HTTP client ───────────────────────────────────────────────────────
+# Every function below talks to PostgREST over HTTPS. The old code opened a fresh
+# `httpx.AsyncClient(...)` for each call (~70 call sites), and each new client
+# rebuilds a connection pool AND a new SSL context + CA bundle — tens of MB of
+# alloc/ free churn on every request and on every background sweep pass. That
+# churn is a prime suspect for the 512MB OOM (exit 137). A single pooled client,
+# created lazily on first use inside the running event loop and reused
+# everywhere, keeps ONE SSL context and reuses keep-alive connections, so
+# steady-state memory stays flat instead of sawtoothing.
+#
+# `_client()` is an async context manager so the call sites keep their exact
+# `async with ... as http:` shape (bodies unchanged) — but it yields the shared
+# client and does NOT close it on exit. The client is torn down once, at app
+# shutdown, via aclose().
+_shared: Optional[httpx.AsyncClient] = None
+
+# Default timeout for every Supabase call (the old sites used 15–20s; 20 is the
+# lenient max, harmless as a shared default).
+_DEFAULT_TIMEOUT = 20.0
+
+
+def _shared_client() -> httpx.AsyncClient:
+    global _shared
+    if _shared is None or _shared.is_closed:
+        _shared = httpx.AsyncClient(
+            timeout=_DEFAULT_TIMEOUT,
+            # Bound the pool so idle keep-alive sockets can't accumulate. The old
+            # per-call clients had, in effect, unbounded concurrent pools.
+            limits=httpx.Limits(max_connections=30, max_keepalive_connections=10),
+        )
+    return _shared
+
+
+@contextlib.asynccontextmanager
+async def _client():
+    """Yield the shared client without closing it. Lets every call site keep its
+    original `async with _client() as http:` structure."""
+    yield _shared_client()
+
+
+async def aclose() -> None:
+    """Close the shared client. Call once from the FastAPI shutdown event."""
+    global _shared
+    if _shared is not None and not _shared.is_closed:
+        await _shared.aclose()
+    _shared = None
 
 
 class SupabaseNotConfigured(RuntimeError):
@@ -97,7 +146,7 @@ def _one(data: Any) -> Optional[Dict[str, Any]]:
 # ── Leads ────────────────────────────────────────────────────────────────────
 async def insert_lead(row: Dict[str, Any], *, token: Optional[str] = None) -> Dict[str, Any]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/leads",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -132,10 +181,42 @@ async def list_leads(
         params["source"] = f"eq.{source}"
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return [_flatten_lead_tags(row) for row in resp.json()]
+
+
+async def list_leads_for_sweep(*, only_new_uncalled: bool = False) -> List[Dict[str, Any]]:
+    """Service-mode lead fetch for the background sweeps (auto-call / follow-up).
+
+    Two differences from list_leads(), both about keeping the per-sweep working
+    set small on the 512MB box:
+
+      * select="*" — NO lead_tags join. The sweeps never read `tags`, so the
+        nested lead_tag_assignments->lead_tags embedding was pure overhead: extra
+        DB work, a bigger JSON payload, and more objects held in memory while the
+        pass runs. Plain columns only.
+
+      * only_new_uncalled=True pushes the auto-call CANDIDATE filter down to
+        Postgres so a growing leads table doesn't inflate the fetch: status
+        'new' AND auto_called_at IS NULL. `leads.status` is NOT NULL DEFAULT
+        'new' (migration 0002), so status.eq.new is exhaustive — it can never be
+        NULL in the DB even though the Python guard defensively treats a missing
+        key as 'new'. Keeping it a plain equality (not an OR with is.null) also
+        lets the partial index leads_auto_call_candidates_idx (migration 0017)
+        serve this query. Which leads get called is unchanged; already-handled
+        rows just stay in the database instead of being pulled over the wire.
+    """
+    url = _base_url()
+    params: Dict[str, str] = {"select": "*", "order": "created_at.desc"}
+    if only_new_uncalled:
+        params["status"] = "eq.new"
+        params["auto_called_at"] = "is.null"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(), params=params)
+    _raise_for_error(resp)
+    return resp.json()
 
 
 async def update_lead_status(
@@ -145,7 +226,7 @@ async def update_lead_status(
     params = {"id": f"eq.{lead_id}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -163,7 +244,7 @@ async def get_lead(
     params = {"id": f"eq.{lead_id}", "select": _LEAD_SELECT_WITH_TAGS, "limit": "1"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(token), params=params)
     _raise_for_error(resp)
     row = _one(resp.json())
@@ -182,7 +263,7 @@ async def recently_auto_called(phone: str, since_iso: str, *, org_id: Optional[s
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(), params=params)
     _raise_for_error(resp)
     return bool(resp.json())
@@ -199,7 +280,7 @@ async def find_lead(
     else:
         params = {"phone": f"eq.{phone}"}
     params.update({"org_id": f"eq.{org_id}", "select": "id,status", "limit": "1"})
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/leads", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return _one(resp.json())
@@ -212,7 +293,7 @@ async def update_lead_fields(
     params = {"id": f"eq.{lead_id}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -237,7 +318,7 @@ async def claim_auto_call(
     params = {"id": f"eq.{lead_id}", "auto_called_at": "is.null"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(None, {"Prefer": "return=representation"}),
@@ -254,7 +335,7 @@ async def release_auto_call(lead_id: str, *, org_id: Optional[str] = None) -> Op
     params = {"id": f"eq.{lead_id}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(None, {"Prefer": "return=representation"}),
@@ -268,7 +349,7 @@ async def release_auto_call(lead_id: str, *, org_id: Optional[str] = None) -> Op
 async def mark_auto_called(lead_id: str, call_id: str, called_at_iso: str) -> Optional[Dict[str, Any]]:
     """Record a successful auto-call. Service mode: runs in a background task."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(None, {"Prefer": "return=representation"}),
@@ -282,7 +363,7 @@ async def mark_auto_called(lead_id: str, call_id: str, called_at_iso: str) -> Op
 # ── Email log + templates ────────────────────────────────────────────────────
 async def insert_email_log(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/email_log",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -302,7 +383,7 @@ async def list_email_logs(
         params["org_id"] = f"eq.{org_id}"
     if lead_id:
         params["lead_id"] = f"eq.{lead_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/email_log", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return resp.json()
@@ -327,7 +408,7 @@ async def rows_since(
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=20) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/{table}", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return resp.json()
@@ -340,7 +421,7 @@ async def list_email_templates(
     params = {"select": "*", "order": "step.asc"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/email_templates", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return resp.json()
@@ -351,7 +432,7 @@ async def upsert_email_template(
 ) -> Optional[Dict[str, Any]]:
     """Insert-or-update this org's template for a step (PK = org_id, step)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/email_templates",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -388,7 +469,7 @@ async def list_knowledge(
     params = {"select": "*", "order": "updated_at.desc"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/knowledge_base", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return resp.json()
@@ -396,7 +477,7 @@ async def list_knowledge(
 
 async def insert_knowledge(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/knowledge_base",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -413,7 +494,7 @@ async def update_knowledge(
     params = {"id": f"eq.{entry_id}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/knowledge_base",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -431,7 +512,7 @@ async def delete_knowledge(
     params = {"id": f"eq.{entry_id}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/knowledge_base",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -460,7 +541,7 @@ async def get_knowledge_content(
 # ── Call log ─────────────────────────────────────────────────────────────────
 async def insert_call_log(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/call_log",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -485,7 +566,7 @@ async def list_call_logs(
         params["org_id"] = f"eq.{org_id}"
     if lead_id:
         params["lead_id"] = f"eq.{lead_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/call_log", headers=_headers(token), params=params)
     _raise_for_error(resp)
     rows = resp.json()
@@ -504,7 +585,7 @@ async def insert_status_history(
     """Append one status-transition row. User mode on the request path so the
     org_isolation RLS policy authorises the write."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/lead_status_history",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -528,7 +609,7 @@ async def list_status_history(
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/lead_status_history", headers=_headers(token), params=params
         )
@@ -551,7 +632,7 @@ async def claim_followup_step(
     params = {"id": f"eq.{lead_id}", "followup_step": f"eq.{expected_step}"}
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -566,7 +647,7 @@ async def set_followup_unsubscribed(lead_id: str) -> Optional[Dict[str, Any]]:
     """Public unsubscribe link — no session, so service mode. Safe because the
     lead id is an unguessable uuid and this only ever sets an opt-out flag."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/leads",
             headers=_headers(None, {"Prefer": "return=representation"}),
@@ -584,7 +665,7 @@ async def get_org_settings(
     """This org's settings row, or None if it has none yet. User mode (RLS) on the
     request path; service mode (explicit org_id) for the background sweeps."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/org_settings",
             headers=_headers(token),
@@ -599,7 +680,7 @@ async def list_all_org_settings() -> List[Dict[str, Any]]:
     this once per pass to resolve settings per-org LIVE, so a dashboard edit is
     reflected on the very next sweep without any caching or restart."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=20) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/org_settings",
             headers=_headers(),
@@ -619,7 +700,7 @@ async def upsert_org_settings(
     columns keep their table defaults on insert and their stored values on update."""
     url = _base_url()
     body = {"org_id": org_id, **fields, "updated_at": _utcnow_iso()}
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/org_settings",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -634,7 +715,7 @@ async def upsert_org_settings(
 async def list_memberships(*, token: str) -> List[Dict[str, Any]]:
     """The caller's orgs. User mode: RLS guarantees only their own rows come back."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/memberships",
             headers=_headers(token),
@@ -649,7 +730,7 @@ async def get_org_by_slug(slug: str) -> Optional[Dict[str, Any]]:
     """Resolve a public enquiry-form slug to an org. Service mode by necessity:
     the submitter is anonymous. Returns only non-secret columns."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/organizations",
             headers=_headers(),
@@ -661,7 +742,7 @@ async def get_org_by_slug(slug: str) -> Optional[Dict[str, Any]]:
 
 async def list_org_members(org_id: str, *, token: str) -> List[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/memberships",
             headers=_headers(token),
@@ -675,7 +756,7 @@ async def list_org_members(org_id: str, *, token: str) -> List[Dict[str, Any]]:
 async def list_invites(org_id: str, *, token: str) -> List[Dict[str, Any]]:
     """This org's still-pending invites, newest first. User mode (RLS)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/invites",
             headers=_headers(token),
@@ -712,7 +793,7 @@ async def create_invite(
         "token": secrets.token_hex(24),
         "expires_at": _iso_in_days(7),
     }
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/invites",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -729,7 +810,7 @@ async def get_invite_by_token(invite_token: str) -> Optional[Dict[str, Any]]:
     from their own JWT. The token is an unguessable secret that stands in for
     that authorisation; the caller still verifies email + status + expiry."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/invites",
             headers=_headers(),
@@ -746,7 +827,7 @@ async def is_org_member(org_id: str, user_id: str) -> bool:
     """Whether a user already belongs to an org. Service mode: used by the invite
     accept to stay idempotent when the signup trigger already joined them."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/memberships",
             headers=_headers(),
@@ -761,7 +842,7 @@ async def mark_invite_accepted(invite_id: str) -> Optional[Dict[str, Any]]:
     """Flag an invite accepted after a successful token redemption. Service mode:
     paired with get_invite_by_token / add_membership_service in the accept flow."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/invites",
             headers=_headers(None, {"Prefer": "return=representation"}),
@@ -776,7 +857,7 @@ async def delete_invite(invite_id: str, org_id: str, *, token: str) -> None:
     """Revoke (hard-delete) a pending invite. org_id is scoped in the params too
     so a stray id can't reach outside the caller's org even before RLS."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/invites", headers=_headers(token),
             params={"id": f"eq.{invite_id}", "org_id": f"eq.{org_id}"},
@@ -787,7 +868,7 @@ async def delete_invite(invite_id: str, org_id: str, *, token: str) -> None:
 async def add_membership(org_id: str, user_id: str, role: str, *, token: str) -> Optional[Dict[str, Any]]:
     """Add an EXISTING user to an org. RLS enforces owner-only."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/memberships",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -804,7 +885,7 @@ async def add_membership_service(org_id: str, user_id: str, role: str) -> Option
     so has no RLS authorisation to insert their own membership. Authorisation
     comes from having redeemed a valid invite token, checked by the caller."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/memberships",
             headers=_headers(None, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -822,7 +903,7 @@ async def update_member_role(
     only for owners. The last-owner trigger (migration 0016) rejects demoting the
     sole owner at the database level regardless of what we do here."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/memberships",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -837,7 +918,7 @@ async def remove_membership(org_id: str, user_id: str, *, token: str) -> None:
     """Remove a member from an org by (org_id, user_id). User mode: owner-only via
     RLS; the last-owner trigger blocks removing the sole owner at the DB level."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/memberships", headers=_headers(token),
             params={"org_id": f"eq.{org_id}", "user_id": f"eq.{user_id}"},
@@ -851,7 +932,7 @@ async def admin_get_user(user_id: str) -> Optional[Dict[str, Any]]:
     the Team view resolves member emails here — AFTER the caller's membership in
     the org has been verified."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/auth/v1/admin/users/{user_id}", headers=_headers())
     if resp.status_code == 404:
         return None
@@ -863,7 +944,7 @@ async def admin_find_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Find an existing auth user by email (invite flow: add them straight away
     instead of leaving a pending invite)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/auth/v1/admin/users",
             headers=_headers(),
@@ -882,7 +963,7 @@ async def admin_find_user_by_email(email: str) -> Optional[Dict[str, Any]]:
 # ── Integration tokens (per-org, replaces the old MongoDB collection) ────────
 async def list_integration_tokens(org_id: str, *, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/integration_tokens",
             headers=_headers(token),
@@ -898,7 +979,7 @@ async def get_integration_token(org_id: str, platform: str) -> Optional[Dict[str
     """Full row INCLUDING the encrypted token columns. Service mode — used by the
     OAuth callback and by adapters acting on the org's behalf."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/integration_tokens",
             headers=_headers(),
@@ -913,7 +994,7 @@ async def upsert_integration_token(row: Dict[str, Any]) -> Optional[Dict[str, An
     """Called from the OAuth callback, which has no user session (the provider
     redirected the browser), so service mode with an explicit org_id."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/integration_tokens",
             headers=_headers(None, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -926,7 +1007,7 @@ async def upsert_integration_token(row: Dict[str, Any]) -> Optional[Dict[str, An
 
 async def delete_integration_token(org_id: str, platform: str, *, token: Optional[str] = None) -> None:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/integration_tokens",
             headers=_headers(token),
@@ -940,7 +1021,7 @@ async def delete_integration_token(org_id: str, platform: str, *, token: Optiona
 # every read and write to the caller's org.
 async def list_tags(*, org_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/lead_tags",
             headers=_headers(token),
@@ -953,7 +1034,7 @@ async def list_tags(*, org_id: str, token: Optional[str] = None) -> List[Dict[st
 
 async def insert_tag(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/lead_tags",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -966,7 +1047,7 @@ async def insert_tag(row: Dict[str, Any], *, token: Optional[str] = None) -> Opt
 async def delete_tag(tag_id: str, *, org_id: str, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Delete a tag from the library. Its assignments cascade away (FK on delete)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/lead_tags",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -978,7 +1059,7 @@ async def delete_tag(tag_id: str, *, org_id: str, token: Optional[str] = None) -
 
 async def get_tag(tag_id: str, *, org_id: str, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/lead_tags",
             headers=_headers(token),
@@ -994,7 +1075,7 @@ async def assign_tag(
     """Attach a tag to a lead. Idempotent: re-assigning the same tag is a no-op
     (merge-duplicates on the (lead_id, tag_id) primary key)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/lead_tag_assignments",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -1009,7 +1090,7 @@ async def unassign_tag(
     lead_id: str, tag_id: str, *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/lead_tag_assignments",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1033,7 +1114,7 @@ async def list_lead_notes(
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(f"{url}/rest/v1/lead_notes", headers=_headers(token), params=params)
     _raise_for_error(resp)
     return resp.json()
@@ -1041,7 +1122,7 @@ async def list_lead_notes(
 
 async def insert_lead_note(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/lead_notes",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1055,7 +1136,7 @@ async def delete_lead_note(
     note_id: str, *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/lead_notes",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1070,7 +1151,7 @@ async def list_custom_field_defs(
     *, org_id: str, token: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/custom_field_defs",
             headers=_headers(token),
@@ -1086,7 +1167,7 @@ async def insert_custom_field_def(
     row: Dict[str, Any], *, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/custom_field_defs",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1100,7 +1181,7 @@ async def update_custom_field_def(
     def_id: str, fields: Dict[str, Any], *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/custom_field_defs",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1116,7 +1197,7 @@ async def delete_custom_field_def(
 ) -> Optional[Dict[str, Any]]:
     """Delete a field definition. Its stored values cascade away (FK on delete)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/custom_field_defs",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1137,7 +1218,7 @@ async def list_lead_custom_values(
     }
     if org_id:
         params["org_id"] = f"eq.{org_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/lead_custom_values", headers=_headers(token), params=params
         )
@@ -1150,7 +1231,7 @@ async def upsert_lead_custom_value(
 ) -> Optional[Dict[str, Any]]:
     """Insert-or-update one lead's value for one field (PK = lead_id, field_def_id)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/lead_custom_values",
             headers=_headers(token, {"Prefer": "resolution=merge-duplicates,return=representation"}),
@@ -1166,7 +1247,7 @@ async def delete_lead_custom_value(
 ) -> Optional[Dict[str, Any]]:
     """Clear a lead's value for one field (used when the value is set to blank)."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/lead_custom_values",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1182,7 +1263,7 @@ async def delete_lead_custom_value(
 # background auto-caller, which resolves the org's default agent with no session.
 async def list_agents(*, org_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/agents",
             headers=_headers(token),
@@ -1198,7 +1279,7 @@ async def get_agent(
     agent_id: str, *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/agents",
             headers=_headers(token),
@@ -1215,7 +1296,7 @@ async def get_default_agent(
     """The org's active default agent (auto-call uses this). Deterministic even if
     two rows are somehow flagged default: newest edit wins."""
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.get(
             f"{url}/rest/v1/agents",
             headers=_headers(token),
@@ -1229,7 +1310,7 @@ async def get_default_agent(
 
 async def insert_agent(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.post(
             f"{url}/rest/v1/agents",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1243,7 +1324,7 @@ async def update_agent(
     agent_id: str, fields: Dict[str, Any], *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/agents",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1258,7 +1339,7 @@ async def delete_agent(
     agent_id: str, *, org_id: str, token: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     url = _base_url()
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.delete(
             f"{url}/rest/v1/agents",
             headers=_headers(token, {"Prefer": "return=representation"}),
@@ -1277,7 +1358,7 @@ async def clear_default_agents(
     params = {"org_id": f"eq.{org_id}", "is_default": "eq.true"}
     if except_id:
         params["id"] = f"neq.{except_id}"
-    async with httpx.AsyncClient(timeout=15) as http:
+    async with _client() as http:
         resp = await http.patch(
             f"{url}/rest/v1/agents",
             headers=_headers(token, {"Prefer": "return=minimal"}),

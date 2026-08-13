@@ -298,7 +298,11 @@ async def run_auto_call_sweep() -> dict:
     _recompute_loop_interval(settings_map)  # adapt the scheduler tick to live values
 
     try:
-        leads = await sb.list_leads()
+        # Candidate leads only (status new/null AND not yet auto-called), plain
+        # columns without the tag join — the sweep reads neither tags nor
+        # already-handled leads, so filtering server-side keeps the per-pass
+        # working set proportional to work-to-do, not to total table size.
+        leads = await sb.list_leads_for_sweep(only_new_uncalled=True)
     except sb.SupabaseNotConfigured as e:
         summary["reason"] = str(e)
         logger.warning("auto-call sweep skipped: %s", e)

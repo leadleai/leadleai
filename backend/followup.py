@@ -540,7 +540,11 @@ async def run_followup_sweep() -> dict:
     _recompute_loop_interval(settings_map)  # adapt the scheduler tick to live values
 
     try:
-        leads = await sb.list_leads()
+        # Plain columns without the tag join (the follow-up sweep never reads
+        # tags). process_lead handles the full lead lifecycle, so we can't filter
+        # by status here the way auto-call does — but dropping the nested
+        # lead_tags embedding still shrinks every row we hold this pass.
+        leads = await sb.list_leads_for_sweep()
     except sb.SupabaseNotConfigured as e:
         logger.warning("followup sweep skipped: %s", e)
         summary["reason"] = str(e)
