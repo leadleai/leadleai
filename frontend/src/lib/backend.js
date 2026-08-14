@@ -198,6 +198,31 @@ export const crmApi = {
   import: () => req("/api/crm/import", { method: "POST" }),
 };
 
+// Compliant PROSPECT finder. Discovery (RapidAPI "Local Business Data") for
+// review + compliant outreach — prospects are SEPARATE from leads and are never
+// auto-called. One search == one upstream API call (free tier is 500/month).
+//   search  -> { query, found, stored, updated, prospects:[…], api_requests_remaining, … }
+//   list    -> [{ id, name, phone, email, website, category, rating, status, notes, … }]
+export const PROSPECT_STATUSES = ["new", "contacted", "interested", "not_interested", "converted"];
+
+export const prospectsApi = {
+  search: ({ category, location, query, limit } = {}) =>
+    req("/api/prospects/search", {
+      method: "POST",
+      body: JSON.stringify({ category, location, query, ...(limit ? { limit } : {}) }),
+    }),
+  list: (status) =>
+    req(`/api/prospects${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  update: (id, { status, notes }) =>
+    req(`/api/prospects/${id}`, { method: "PATCH", body: JSON.stringify({ status, notes }) }),
+  // Compliant cold email (needs a discovered email; unsubscribe link is appended
+  // server-side). Body is user-edited in the compose dialog.
+  sendEmail: (id, { to, subject, body }) =>
+    req(`/api/prospects/${id}/email`, { method: "POST", body: JSON.stringify({ to, subject, body }) }),
+  // Promote a prospect into the normal leads pipeline (source='prospect').
+  convert: (id) => req(`/api/prospects/${id}/convert`, { method: "POST" }),
+};
+
 export const followupApi = {
   getSettings: () => req("/api/settings/followup"),
   setSettings: (enabled) =>

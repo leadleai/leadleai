@@ -20,6 +20,7 @@ from integrations.router import router as integrations_router
 from connections import router as connections_router
 from leads import router as leads_router
 from lead_import import router as lead_import_router
+from prospects import router as prospects_router
 from calls import router as calls_router, log_router as call_log_router
 from auto_call import settings_router
 from crm.router import router as crm_router
@@ -95,6 +96,10 @@ app.include_router(connections_router)
 app.include_router(leads_router)
 # Excel/CSV lead import (upload -> preview/map -> confirm).
 app.include_router(lead_import_router)
+# Compliant PROSPECT finder: RapidAPI "Local Business Data" search -> stored,
+# reviewable prospects (org-scoped, RLS). SEPARATE from leads and NEVER
+# auto-called; a prospect only enters the calling pipeline once CONVERTED to a lead.
+app.include_router(prospects_router)
 app.include_router(calls_router)
 # Call history (call_log), newest first.
 app.include_router(call_log_router)

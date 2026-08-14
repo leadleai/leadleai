@@ -26,6 +26,7 @@ import { toast } from "sonner";
 const nav = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/app" },
   { label: "Leads", icon: Users, path: "/app/leads" },
+  { label: "Prospects", icon: Microscope, path: "/app/prospects" },
   { label: "Team", icon: UsersRound, path: "/app/team" },
   { label: "Campaigns", icon: Megaphone, path: "/app/campaigns" },
   { label: "Emails", icon: Mail, path: "/app/emails" },

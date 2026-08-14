@@ -1460,3 +1460,113 @@ async def clear_default_agents(
             json={"is_default": False},
         )
     _raise_for_error(resp)
+
+
+# ── Prospects (compliant business discovery; SEPARATE from leads) ─────────────
+# User mode (RLS) on the request path; service mode (explicit id) only for the
+# public cold-email unsubscribe link, which has no user session.
+async def insert_prospect(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/prospects",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_prospects(
+    *, org_id: str, token: Optional[str] = None, status: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """This org's prospects, newest first. Optionally filtered by status."""
+    url = _base_url()
+    params = {"org_id": f"eq.{org_id}", "select": "*", "order": "created_at.desc"}
+    if status:
+        params["status"] = f"eq.{status}"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/prospects", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def get_prospect(
+    prospect_id: str, *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{prospect_id}", "select": "*", "limit": "1"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/prospects", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def find_prospect_by_identity(
+    external_id: Optional[str], phone: Optional[str], website: Optional[str],
+    *, org_id: str, token: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Find an existing prospect in THIS org by business_id OR phone OR website —
+    for search dedupe so re-running a query doesn't duplicate rows. Always
+    org-scoped: two tenants may legitimately discover the same business. Returns
+    None when there's nothing to match on."""
+    external_id = (external_id or "").strip()
+    phone = (phone or "").strip()
+    website = (website or "").strip()
+    clauses = []
+    if external_id:
+        clauses.append(f"external_id.eq.{external_id}")
+    if phone:
+        clauses.append(f"phone.eq.{phone}")
+    if website:
+        clauses.append(f"website.eq.{website}")
+    if not clauses:
+        return None
+
+    url = _base_url()
+    if len(clauses) == 1:
+        field, value = clauses[0].split(".eq.", 1)
+        params = {field: f"eq.{value}"}
+    else:
+        params = {"or": f"({','.join(clauses)})"}
+    params.update({"org_id": f"eq.{org_id}", "select": "*", "limit": "1"})
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/prospects", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def update_prospect_fields(
+    prospect_id: str, fields: Dict[str, Any], *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{prospect_id}"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/prospects",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params=params,
+            json=fields,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def set_prospect_unsubscribed(prospect_id: str) -> Optional[Dict[str, Any]]:
+    """Public cold-email unsubscribe link — no session, so service mode. Safe
+    because the prospect id is an unguessable uuid and this only ever sets an
+    opt-out flag."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/prospects",
+            headers=_headers(None, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{prospect_id}"},
+            json={"unsubscribed": True},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
