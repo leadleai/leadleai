@@ -3,17 +3,32 @@ import { motion } from "framer-motion";
 import {
   Search, Loader2, AlertTriangle, Mail, Phone as PhoneIcon, Globe, MapPin, Star,
   RefreshCw, Microscope, X, UserPlus, CheckCircle2, ShieldCheck, Send,
+  Bookmark, Trash2, Repeat, Clock,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/Primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { prospectsApi, PROSPECT_STATUSES } from "@/lib/backend";
+import { prospectsApi, savedSearchesApi, PROSPECT_STATUSES } from "@/lib/backend";
 import { toast } from "sonner";
+
+// Short "last run" relative label for a saved search.
+function lastRunLabel(iso) {
+  if (!iso) return "never run yet";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "never run yet";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "ran just now";
+  if (mins < 60) return `ran ${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `ran ${hrs}h ago`;
+  return `ran ${Math.round(hrs / 24)}d ago`;
+}
 
 // Monochrome status treatments, mirroring the Leads page.
 const STATUS_META = {
@@ -65,6 +80,10 @@ export default function Prospects() {
   const [draft, setDraft] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
 
+  // Saved searches (the queries re-run on a schedule by the automated sweep).
+  const [saved, setSaved] = useState([]);
+  const [savingSearch, setSavingSearch] = useState(false);
+
   const load = useCallback(async () => {
     setState("loading");
     setError(null);
@@ -78,7 +97,63 @@ export default function Prospects() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadSaved = useCallback(async () => {
+    try {
+      const data = await savedSearchesApi.list();
+      setSaved(Array.isArray(data) ? data : []);
+    } catch { /* best-effort — the saved-search panel just stays empty */ }
+  }, []);
+
+  useEffect(() => { load(); loadSaved(); }, [load, loadSaved]);
+
+  // Save the current category+location as a scheduled search.
+  const saveCurrentSearch = async () => {
+    if (!category.trim() || !location.trim()) {
+      toast.error("Enter both a category and a location to save.");
+      return;
+    }
+    setSavingSearch(true);
+    try {
+      const created = await savedSearchesApi.create({ category: category.trim(), location: location.trim() });
+      setSaved((s) => [created, ...s]);
+      toast.success("Search saved", {
+        description: "It'll re-run on the schedule set in Automation settings.",
+      });
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  const toggleSaved = async (s, is_active) => {
+    setSaved((list) => list.map((x) => (x.id === s.id ? { ...x, is_active } : x)));
+    try {
+      await savedSearchesApi.update(s.id, { is_active });
+    } catch (e) {
+      setSaved((list) => list.map((x) => (x.id === s.id ? { ...x, is_active: !is_active } : x)));
+      toast.error(e.message);
+    }
+  };
+
+  const removeSaved = async (s) => {
+    const prev = saved;
+    setSaved((list) => list.filter((x) => x.id !== s.id));
+    try {
+      await savedSearchesApi.remove(s.id);
+      toast.success("Saved search removed");
+    } catch (e) {
+      setSaved(prev);
+      toast.error(e.message);
+    }
+  };
+
+  // Load a saved search back into the manual search form (and run it).
+  const runSaved = (s) => {
+    setCategory(s.category || "");
+    setLocation(s.location || "");
+    toast.info(`Loaded “${s.query}” — press Search to run it now.`);
+  };
 
   const runSearch = async (e) => {
     e?.preventDefault();
@@ -229,10 +304,17 @@ export default function Prospects() {
             <Input data-testid="prospect-location" value={location} onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Mumbai" className="rounded-xl" />
           </div>
-          <Button data-testid="prospect-search-btn" type="submit" disabled={searching}
-            className="rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
-            {searching ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Searching…</> : <><Search className="w-4 h-4 mr-1" /> Search</>}
-          </Button>
+          <div className="flex gap-2">
+            <Button data-testid="prospect-search-btn" type="submit" disabled={searching}
+              className="rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+              {searching ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Searching…</> : <><Search className="w-4 h-4 mr-1" /> Search</>}
+            </Button>
+            <Button data-testid="prospect-save-search-btn" type="button" variant="outline"
+              disabled={savingSearch} onClick={saveCurrentSearch} className="rounded-full"
+              title="Save this category + location to re-run automatically">
+              {savingSearch ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Bookmark className="w-4 h-4 mr-1" />} Save
+            </Button>
+          </div>
         </div>
         {usage && (
           <p className="mt-2 text-xs text-muted-foreground" data-testid="prospect-usage">
@@ -242,6 +324,51 @@ export default function Prospects() {
           </p>
         )}
       </form>
+
+      {/* Saved / scheduled searches */}
+      {saved.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/[0.02] p-4" data-testid="saved-searches">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Repeat className="w-4 h-4 text-neutral-500" />
+              <span className="text-sm font-medium">Saved searches</span>
+              <Badge className="rounded-full border-0 bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                {saved.filter((s) => s.is_active).length} active
+              </Badge>
+            </div>
+            <a href="/app/settings" className="text-xs text-muted-foreground underline underline-offset-2 hover:text-neutral-700 dark:hover:text-neutral-200">
+              Set the schedule in Automation →
+            </a>
+          </div>
+          <div className="divide-y divide-neutral-100 dark:divide-white/10">
+            {saved.map((s) => (
+              <div key={s.id} className="flex items-center gap-3 py-2.5" data-testid={`saved-search-${s.id}`}>
+                <div className="min-w-0 flex-1">
+                  <button onClick={() => runSaved(s)} className="truncate text-left text-sm font-medium hover:underline underline-offset-2">
+                    {s.query}
+                  </button>
+                  <p className="flex items-center gap-1 text-xs text-neutral-400">
+                    <Clock className="w-3 h-3" /> {lastRunLabel(s.last_run_at)}
+                    {!s.is_active && <span className="ml-1">· paused</span>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Switch checked={!!s.is_active} onCheckedChange={(v) => toggleSaved(s, v)}
+                    data-testid={`saved-search-toggle-${s.id}`} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-neutral-400 hover:text-red-600"
+                    onClick={() => removeSaved(s)} data-testid={`saved-search-delete-${s.id}`}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            Active searches re-run automatically and only <strong>discover</strong> new businesses into this list — nothing is auto-emailed or auto-called.
+          </p>
+        </div>
+      )}
 
       {/* Status filter chips */}
       {state === "ready" && usedStatuses.length > 1 && (

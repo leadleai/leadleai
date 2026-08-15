@@ -1570,3 +1570,146 @@ async def set_prospect_unsubscribed(prospect_id: str) -> Optional[Dict[str, Any]
         )
     _raise_for_error(resp)
     return _one(resp.json())
+
+
+# ── Saved searches (scheduled/automated prospect discovery) ───────────────────
+# User mode (RLS) on the request path; service mode (explicit org_id) for the
+# background sweep (list_active_saved_searches_for_sweep / touch_saved_search_run).
+async def list_saved_searches(
+    *, org_id: str, token: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """This org's saved searches, newest first."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "select": "*", "order": "created_at.desc"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def get_saved_search(
+    search_id: str, *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{search_id}", "select": "*", "limit": "1"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/saved_searches", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def insert_saved_search(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def update_saved_search(
+    search_id: str, fields: Dict[str, Any], *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{search_id}"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params=params,
+            json=fields,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def delete_saved_search(
+    search_id: str, *, org_id: str, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.delete(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{search_id}", "org_id": f"eq.{org_id}"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_active_saved_searches() -> List[Dict[str, Any]]:
+    """EVERY org's ACTIVE saved searches. Service mode (no user session): the
+    prospect-search sweep calls this once per pass, groups by org_id, and — using
+    each org's LIVE settings — runs the ones whose interval has elapsed."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(),
+            params={"is_active": "eq.true", "select": "*", "limit": "100000"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def touch_saved_search_run(search_id: str, now_iso: str) -> Optional[Dict[str, Any]]:
+    """Stamp last_run_at after the sweep runs a saved search. Service mode."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/saved_searches",
+            headers=_headers(None, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{search_id}"},
+            json={"last_run_at": now_iso},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+# ── Prospect-search usage log (drives the monthly quota + usage endpoint) ─────
+async def insert_prospect_search_run(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Record one executed automated search. Service mode: written only by the
+    sweep, which has no user session."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/prospect_search_runs",
+            headers=_headers(None, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def count_prospect_search_runs_since(
+    org_id: str, since_iso: str, *, token: Optional[str] = None
+) -> int:
+    """How many automated searches this org has run at/after since_iso — the
+    monthly-quota count. Uses PostgREST's exact count (Content-Range header) so we
+    never pull the rows themselves. USER mode (RLS) for the usage endpoint; SERVICE
+    mode (explicit org_id, no token) for the sweep's pre-flight quota check."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/prospect_search_runs",
+            headers=_headers(token, {"Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0"}),
+            params={"org_id": f"eq.{org_id}", "created_at": f"gte.{since_iso}", "select": "id"},
+        )
+    _raise_for_error(resp)
+    # Content-Range looks like "0-0/42" (or "*/0" when empty); the total is after '/'.
+    content_range = resp.headers.get("content-range") or resp.headers.get("Content-Range") or ""
+    total = content_range.split("/")[-1].strip()
+    try:
+        return int(total)
+    except (TypeError, ValueError):
+        return 0

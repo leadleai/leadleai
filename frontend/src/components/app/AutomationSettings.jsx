@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   PhoneCall, Mail, Clock, Sparkles, Search, Loader2, AlertTriangle,
-  Save, RotateCcw, Timer, Gauge,
+  Save, RotateCcw, Timer, Gauge, Microscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { orgSettingsApi } from "@/lib/backend";
+import { Slider } from "@/components/ui/slider";
+import { orgSettingsApi, savedSearchesApi } from "@/lib/backend";
 import { toast } from "sonner";
 
 // The fields this editor owns (everything the sweeps read per-org). Deployment
@@ -19,7 +20,36 @@ const EDITABLE = [
   "followup_enabled", "followup_from_email", "followup_schedule_hours",
   "agent_name", "kb_matching_enabled", "ai_emails_enabled",
   "auto_call_sweep_seconds", "followup_sweep_seconds",
+  "prospect_search_enabled", "prospect_search_frequency_hours", "prospect_search_max_per_month",
 ];
+
+// Discrete frequency stops for the automated-prospect-search slider, from "every
+// 6 hours" to "once a month". The slider is an INDEX into this array; the stored
+// value is the `hours`. AVG_HOURS_PER_MONTH mirrors the backend constant so the
+// live credit estimate here matches the sweep's own quota reckoning.
+const FREQ_STOPS = [
+  { hours: 6, label: "Every 6 hours" },
+  { hours: 12, label: "Every 12 hours" },
+  { hours: 24, label: "Daily" },
+  { hours: 48, label: "Every 2 days" },
+  { hours: 72, label: "Every 3 days" },
+  { hours: 168, label: "Weekly" },
+  { hours: 336, label: "Every 2 weeks" },
+  { hours: 744, label: "Once a month" },
+];
+const AVG_HOURS_PER_MONTH = 730;
+const FREE_TIER_MONTHLY_LIMIT = 500;
+
+// Snap an arbitrary stored frequency to the nearest slider stop index.
+const freqToIndex = (hours) => {
+  const h = Number(hours) || 168;
+  let best = 0, bestDelta = Infinity;
+  FREQ_STOPS.forEach((s, i) => {
+    const d = Math.abs(s.hours - h);
+    if (d < bestDelta) { bestDelta = d; best = i; }
+  });
+  return best;
+};
 
 const COMMON_TZS = [
   "Asia/Kolkata", "UTC", "America/New_York", "America/Chicago", "America/Los_Angeles",
@@ -63,6 +93,9 @@ export default function AutomationSettings() {
   const [initial, setInitial] = useState(null); // last-saved snapshot (editable fields)
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Automated-prospect-search usage: active saved-search count + this month's runs.
+  // Drives the LIVE credit estimate under the frequency slider.
+  const [usage, setUsage] = useState(null);
 
   const load = async () => {
     setState("loading"); setError(null);
@@ -74,6 +107,8 @@ export default function AutomationSettings() {
       setFlags(data);
       setState("ready");
     } catch (e) { setError(e.message); setState("error"); }
+    // Usage is best-effort — the rest of the editor must still render if it fails.
+    try { setUsage(await savedSearchesApi.usage()); } catch { /* ignore */ }
   };
   useEffect(() => { load(); }, []);
 
@@ -81,6 +116,29 @@ export default function AutomationSettings() {
     () => initial && JSON.stringify(form) !== JSON.stringify(initial),
     [form, initial]
   );
+
+  // LIVE credit estimate for the automated-search slider. Recomputes as the slider
+  // moves (form.prospect_search_frequency_hours) and as the active saved-search
+  // count changes — exactly the sweep's own reckoning:
+  //   runs/month     = AVG_HOURS_PER_MONTH / frequency_hours
+  //   projected use  = active saved searches × runs/month
+  const estimate = useMemo(() => {
+    const freq = Number(form?.prospect_search_frequency_hours) || 168;
+    const active = usage?.active_search_count ?? 0;
+    const runsPerMonth = AVG_HOURS_PER_MONTH / freq;
+    const projected = Math.round(active * runsPerMonth);
+    // Frame against the org's own cap, but never above the hard 500 free-tier limit.
+    const cap = Math.min(
+      Number(form?.prospect_search_max_per_month) || 0, FREE_TIER_MONTHLY_LIMIT
+    );
+    return {
+      active,
+      runsPerMonth: Math.round(runsPerMonth * 10) / 10,
+      projected,
+      cap,
+      over: projected > cap || projected > FREE_TIER_MONTHLY_LIMIT,
+    };
+  }, [form?.prospect_search_frequency_hours, form?.prospect_search_max_per_month, usage]);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const setNum = (key, value) => set(key, value === "" ? "" : Number(value));
@@ -115,6 +173,7 @@ export default function AutomationSettings() {
       toast.success("Automation settings saved", {
         description: "Takes effect on the next sweep — no restart needed.",
       });
+      try { setUsage(await savedSearchesApi.usage()); } catch { /* best-effort */ }
     } catch (e) {
       toast.error("Couldn’t save settings", { description: e.message });
     } finally { setSaving(false); }
@@ -229,6 +288,73 @@ export default function AutomationSettings() {
             <Warn>AI not configured — set ANTHROPIC_API_KEY in backend/.env to enable AI-written follow-ups.</Warn>
           )}
         </div>
+      </Card>
+
+      {/* Automated prospect search */}
+      <Card>
+        <CardHead icon={Microscope} title="Automated prospect search"
+          desc="Re-run your saved searches on a schedule to keep discovering new businesses. Discovery only — new prospects land in Prospects for review; nothing is auto-emailed or auto-called." />
+        <ToggleRow label="Enable automated searches" checked={!!form.prospect_search_enabled}
+          onChange={(v) => set("prospect_search_enabled", v)}
+          badge={form.prospect_search_enabled ? "ON" : "OFF"} />
+        {!flags.rapidapi_configured && (
+          <Warn>RAPIDAPI_KEY isn’t set — automated searches will fail until it’s configured in backend/.env.</Warn>
+        )}
+
+        {/* Frequency slider */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">How often each saved search re-runs</Label>
+            <span className="text-sm font-medium" data-testid="prospect-freq-label">
+              {FREQ_STOPS[freqToIndex(form.prospect_search_frequency_hours)].label}
+            </span>
+          </div>
+          <Slider
+            className="mt-3"
+            data-testid="prospect-freq-slider"
+            min={0} max={FREQ_STOPS.length - 1} step={1}
+            value={[freqToIndex(form.prospect_search_frequency_hours)]}
+            onValueChange={([i]) => set("prospect_search_frequency_hours", FREQ_STOPS[i].hours)}
+          />
+          <div className="mt-1 flex justify-between text-[11px] text-neutral-400">
+            <span>Every 6 hours</span>
+            <span>Once a month</span>
+          </div>
+
+          {/* LIVE credit estimate — recomputes as the slider moves */}
+          <p
+            data-testid="prospect-estimate"
+            className={`mt-3 text-sm flex items-start gap-1.5 ${
+              estimate.over ? "text-red-600 dark:text-red-400 font-medium" : "text-neutral-500 dark:text-neutral-400"
+            }`}>
+            <Search className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            {estimate.active === 0 ? (
+              <span>
+                No active saved searches yet — add some from the{" "}
+                <a href="/app/prospects" className="underline underline-offset-2">Prospects</a> page.
+                Once you do, this shows how much of your monthly quota the schedule will use.
+              </span>
+            ) : (
+              <span>
+                At this frequency with your {estimate.active} active saved{" "}
+                {estimate.active === 1 ? "search" : "searches"}, this will use{" "}
+                <strong>~{estimate.projected}</strong> of your {estimate.cap || FREE_TIER_MONTHLY_LIMIT} monthly
+                searches ({estimate.runsPerMonth} run{estimate.runsPerMonth === 1 ? "" : "s"}/search each month).
+                {estimate.over && " That exceeds your cap — lower the frequency, reduce active searches, or raise the cap."}
+              </span>
+            )}
+          </p>
+          {usage && (
+            <p className="mt-1 text-xs text-neutral-400" data-testid="prospect-usage">
+              {usage.used} of {usage.max_per_month} used so far this month · {usage.remaining} remaining.
+            </p>
+          )}
+        </div>
+
+        <Field label="Monthly search cap" hint={`Hard limit on automated searches per month (max ${FREE_TIER_MONTHLY_LIMIT} — the API free tier).`} className="pt-1">
+          <NumberInput value={form.prospect_search_max_per_month} min={0} max={FREE_TIER_MONTHLY_LIMIT}
+            onChange={(v) => setNum("prospect_search_max_per_month", v)} suffix="/mo" testid="prospect-cap-input" />
+        </Field>
       </Card>
 
       {/* Sweep frequency (advanced) */}

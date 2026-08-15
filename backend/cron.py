@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 
 import auto_call
 import followup
+import prospects
 
 logger = logging.getLogger("cron")
 router = APIRouter(prefix="/api/cron", tags=["cron"])
@@ -62,3 +63,14 @@ async def followup_sweep(_: bool = Depends(require_cron_secret)):
     result = await followup.run_followup_sweep()
     logger.info("cron: followup-sweep result: %s", result)
     return {"job": "followup-sweep", **result}
+
+
+@router.post("/prospect-search-sweep")
+async def prospect_search_sweep(_: bool = Depends(require_cron_secret)):
+    """Run one scheduled-prospect-search sweep: for each org with the feature on,
+    re-run every active saved search whose frequency has elapsed (up to the monthly
+    cap), DISCOVERING new prospects. Never auto-contacts — review stays manual."""
+    logger.info("cron: prospect-search-sweep triggered")
+    result = await prospects.run_prospect_search_sweep()
+    logger.info("cron: prospect-search-sweep result: %s", result)
+    return {"job": "prospect-search-sweep", **result}

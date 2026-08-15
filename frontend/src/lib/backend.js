@@ -223,6 +223,20 @@ export const prospectsApi = {
   convert: (id) => req(`/api/prospects/${id}/convert`, { method: "POST" }),
 };
 
+// Saved searches — the category+location queries re-run on a schedule by the
+// background sweep. CRUD is org-scoped; the TIMING (enable / frequency / monthly
+// cap) lives in org_settings and is edited via orgSettingsApi. `usage` returns
+// this month's automated-search count + the inputs for the live credit estimate.
+export const savedSearchesApi = {
+  list: () => req("/api/saved-searches"),
+  create: ({ category, location, query } = {}) =>
+    req("/api/saved-searches", { method: "POST", body: JSON.stringify({ category, location, query }) }),
+  update: (id, patch) =>
+    req(`/api/saved-searches/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  remove: (id) => req(`/api/saved-searches/${id}`, { method: "DELETE" }),
+  usage: () => req("/api/saved-searches/usage"),
+};
+
 export const followupApi = {
   getSettings: () => req("/api/settings/followup"),
   setSettings: (enabled) =>

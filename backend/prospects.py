@@ -38,6 +38,7 @@ public unsubscribe link):
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -297,6 +298,49 @@ async def _call_local_business_search(query: str, limit: int) -> tuple[List[Dict
     return businesses, usage
 
 
+# ── Store / dedupe (shared by the manual endpoint AND the automated sweep) ────
+async def _store_businesses(
+    businesses: List[Dict[str, Any]], *, org_id: str, token: Optional[str] = None, source: str = "prospect_search",
+) -> tuple[int, int, List[str]]:
+    """Normalize + dedupe + store a batch of RapidAPI businesses as prospects for
+    `org_id`. Returns (stored_new, updated_existing, touched_ids). USER mode when a
+    token is passed (request path, RLS-enforced); SERVICE mode with an explicit
+    org_id for the background sweep (no user session). Only ever DISCOVERS — every
+    inserted row is status 'new'; existing rows keep the user's status/notes."""
+    stored = updated = 0
+    result_ids: List[str] = []
+    for business in businesses:
+        norm = normalize_business(business)
+        if not norm:
+            continue
+        existing = await sb.find_prospect_by_identity(
+            norm.get("external_id"), norm.get("phone"), norm.get("website"),
+            org_id=org_id, token=token,
+        )
+        if existing:
+            # Refresh discovered contact details, but PRESERVE the user's own
+            # status/notes/unsubscribed so re-searching never clobbers review
+            # progress. Only fill in fields, never overwrite a set status.
+            fields: Dict[str, Any] = {}
+            for k in ("phone", "email", "address", "website", "category", "rating", "review_count", "external_id"):
+                if norm.get(k) is not None:
+                    fields[k] = norm[k]
+            row = await sb.update_prospect_fields(existing["id"], fields, org_id=org_id, token=token)
+            updated += 1
+            result_ids.append((row or existing)["id"])
+        else:
+            row = await sb.insert_prospect({
+                "org_id": org_id,
+                "source": source,
+                "status": "new",
+                **norm,
+            }, token=token)
+            stored += 1
+            if row:
+                result_ids.append(row["id"])
+    return stored, updated, result_ids
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 @router.post("/search", response_model=ProspectSearchOut)
 async def search_prospects(payload: ProspectSearchIn, ctx: OrgContext = Depends(require_org)):
@@ -310,38 +354,10 @@ async def search_prospects(payload: ProspectSearchIn, ctx: OrgContext = Depends(
     logger.info("[prospects search org=%s] '%s' -> %d businesses (remaining=%s)",
                 ctx.org_id, query, len(businesses), usage.get("remaining"))
 
-    stored = updated = 0
-    result_ids: List[str] = []
     try:
-        for business in businesses:
-            norm = normalize_business(business)
-            if not norm:
-                continue
-            existing = await sb.find_prospect_by_identity(
-                norm.get("external_id"), norm.get("phone"), norm.get("website"),
-                org_id=ctx.org_id, token=ctx.token,
-            )
-            if existing:
-                # Refresh discovered contact details, but PRESERVE the user's own
-                # status/notes/unsubscribed so re-searching never clobbers review
-                # progress. Only fill in fields, never overwrite a set status.
-                fields: Dict[str, Any] = {}
-                for k in ("phone", "email", "address", "website", "category", "rating", "review_count", "external_id"):
-                    if norm.get(k) is not None:
-                        fields[k] = norm[k]
-                row = await sb.update_prospect_fields(existing["id"], fields, org_id=ctx.org_id, token=ctx.token)
-                updated += 1
-                result_ids.append((row or existing)["id"])
-            else:
-                row = await sb.insert_prospect({
-                    "org_id": ctx.org_id,            # the CALLING user's org
-                    "source": "prospect_search",
-                    "status": "new",
-                    **norm,
-                }, token=ctx.token)
-                stored += 1
-                if row:
-                    result_ids.append(row["id"])
+        stored, updated, result_ids = await _store_businesses(
+            businesses, org_id=ctx.org_id, token=ctx.token,
+        )
     except sb.SupabaseNotConfigured as e:
         raise HTTPException(status_code=503, detail=str(e))
     except sb.SupabaseError as e:
@@ -533,6 +549,173 @@ async def convert_prospect(prospect_id: str, ctx: OrgContext = Depends(require_o
 
     logger.info("[prospects convert id=%s org=%s] -> lead %s", prospect_id, ctx.org_id, lead_id)
     return {"converted": True, "lead_id": lead_id, "already": False}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SCHEDULED / AUTOMATED PROSPECT SEARCH SWEEP
+# ─────────────────────────────────────────────────────────────────────────────
+# Driven by Cloud Scheduler → POST /api/cron/prospect-search-sweep (cron.py). Same
+# shape as the auto-call / follow-up sweeps: settings are read LIVE per pass
+# (org_settings.resolve_all), so a dashboard edit lands on the very next sweep with
+# no restart. DISCOVERY ONLY — every stored row is status 'new'; nothing is ever
+# auto-contacted, auto-emailed, or auto-called.
+# ═════════════════════════════════════════════════════════════════════════════
+# The estimate/quota both reckon a month as this many hours (365.25/12*24 ≈ 730.5),
+# so "runs per month" for a given frequency is AVG_HOURS_PER_MONTH / frequency_hours.
+AVG_HOURS_PER_MONTH = 730.0
+
+
+def month_start_iso(now: Optional[datetime] = None) -> str:
+    """Start of the current UTC calendar month, ISO — the quota window boundary."""
+    now = now or datetime.now(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """Robust timestamptz parse (Supabase; py<3.11 fromisoformat is strict)."""
+    if not value:
+        return None
+    v = value.strip()
+    if v.endswith("Z"):
+        v = v[:-1] + "+00:00"
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})(?:\.(\d+))?(.*)$", v)
+    if m:
+        base, frac, tail = m.group(1), m.group(2), m.group(3) or ""
+        v = f"{base}.{(frac + '000000')[:6]}{tail}" if frac else f"{base}{tail}"
+    try:
+        dt = datetime.fromisoformat(v)
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _search_is_due(search: Dict[str, Any], frequency_hours: int, now: datetime) -> bool:
+    """A saved search is due when it has never run, or its own last_run_at is older
+    than the org's configured frequency. Per-row last_run_at is also what makes the
+    sweep idempotent under a Scheduler double-fire: a just-run search isn't due."""
+    last = _parse_dt(search.get("last_run_at"))
+    if last is None:
+        return True
+    return (now - last).total_seconds() >= frequency_hours * 3600.0
+
+
+async def run_prospect_search_sweep() -> dict:
+    """Periodic job: for EACH org with prospect_search_enabled, run every active
+    saved search whose own frequency has elapsed, DISCOVERING new prospects — up to
+    the org's monthly cap. Reuses the exact manual search path (one RapidAPI call
+    per search) + dedupe. Never contacts anyone."""
+    summary = {"orgs_swept": 0, "searches_run": 0, "prospects_added": 0,
+               "skipped": {"disabled_or_not_due": 0, "quota": 0, "error": 0}, "reason": None}
+
+    settings_map = await org_settings.resolve_all()
+
+    try:
+        searches = await sb.list_active_saved_searches()
+    except sb.SupabaseNotConfigured as e:
+        logger.warning("prospect-search sweep skipped: %s", e)
+        summary["reason"] = str(e)
+        return summary
+    except Exception as e:
+        logger.exception("prospect-search sweep: could not list saved searches: %s", e)
+        summary["reason"] = str(e)
+        return summary
+
+    from collections import defaultdict
+    by_org: dict = defaultdict(list)
+    for s in searches:
+        by_org[s.get("org_id")].append(s)
+
+    now = datetime.now(timezone.utc)
+    since = month_start_iso(now)
+
+    for org_id, org_searches in by_org.items():
+        cfg = org_settings.for_org_or_default(org_id, settings_map)
+        if not cfg.prospect_search_enabled:
+            summary["skipped"]["disabled_or_not_due"] += len(org_searches)
+            continue
+
+        # Which of this org's searches are due right now (per-row frequency gate).
+        due = [s for s in org_searches if _search_is_due(s, cfg.prospect_search_frequency_hours, now)]
+        if not due:
+            summary["skipped"]["disabled_or_not_due"] += len(org_searches)
+            continue
+
+        # Monthly quota: how many automated searches are left this calendar month.
+        try:
+            used = await sb.count_prospect_search_runs_since(org_id, since)
+        except Exception as e:
+            logger.warning("prospect-search sweep: org=%s quota read failed (%s); skipping org", org_id, e)
+            summary["skipped"]["error"] += len(due)
+            continue
+        remaining = cfg.prospect_search_max_per_month - used
+        if remaining <= 0:
+            logger.info("prospect-search sweep: org=%s at monthly cap (%d/%d) — skipping %d search(es)",
+                        org_id, used, cfg.prospect_search_max_per_month, len(due))
+            summary["skipped"]["quota"] += len(due)
+            continue
+
+        summary["orgs_swept"] += 1
+        for search in due:
+            if remaining <= 0:
+                # Hit the cap partway through this org's due searches.
+                summary["skipped"]["quota"] += 1
+                logger.info("prospect-search sweep: org=%s reached cap mid-pass, deferring search=%s",
+                            org_id, search.get("id"))
+                continue
+
+            query = (search.get("query") or "").strip()
+            if not query:
+                parts = [p for p in (search.get("category"), search.get("location")) if p]
+                query = f"{parts[0]} in {parts[1]}" if len(parts) == 2 else " ".join(parts)
+            if not query:
+                logger.warning("prospect-search sweep: org=%s search=%s has no query — skipping",
+                               org_id, search.get("id"))
+                continue
+
+            try:
+                businesses, _usage = await _call_local_business_search(query, DEFAULT_LIMIT)
+                stored, updated, _ids = await _store_businesses(businesses, org_id=org_id, token=None)
+            except HTTPException as e:
+                # Upstream/config error (e.g. rate limit, missing key). Log and move
+                # on WITHOUT stamping last_run_at, so it retries next sweep.
+                logger.warning("prospect-search sweep: org=%s search=%s failed: %s",
+                               org_id, search.get("id"), e.detail)
+                summary["skipped"]["error"] += 1
+                continue
+            except Exception as e:
+                logger.exception("prospect-search sweep: org=%s search=%s unexpected error: %s",
+                                 org_id, search.get("id"), e)
+                summary["skipped"]["error"] += 1
+                continue
+
+            # Success: this counted as one API call against the monthly cap.
+            remaining -= 1
+            summary["searches_run"] += 1
+            summary["prospects_added"] += stored
+            now_iso = now.isoformat()
+            # Best-effort bookkeeping — the discovery already happened, so a
+            # logging/stamp failure must not abort the pass.
+            try:
+                await sb.insert_prospect_search_run({
+                    "org_id": org_id,
+                    "saved_search_id": search.get("id"),
+                    "query": query,
+                    "found": len(businesses),
+                    "stored": stored,
+                })
+            except Exception as e:
+                logger.warning("prospect-search sweep: org=%s run-log write failed: %s", org_id, e)
+            try:
+                await sb.touch_saved_search_run(search["id"], now_iso)
+            except Exception as e:
+                logger.warning("prospect-search sweep: org=%s last_run_at stamp failed: %s", org_id, e)
+
+            logger.info("prospect-search sweep: org=%s '%s' -> found=%d new=%d updated=%d (cap left=%d)",
+                        org_id, query, len(businesses), stored, updated, remaining)
+
+    logger.info("prospect-search sweep done: %d org(s), %d search(es) run, %d new prospect(s)",
+                summary["orgs_swept"], summary["searches_run"], summary["prospects_added"])
+    return summary
 
 
 # ── Public cold-email unsubscribe ────────────────────────────────────────────

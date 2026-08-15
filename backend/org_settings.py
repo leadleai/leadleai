@@ -123,6 +123,9 @@ def env_defaults() -> "ResolvedSettings":
         ai_emails_enabled=_env_bool("AI_EMAILS_ENABLED", False),
         auto_call_sweep_seconds=_env_int("AUTO_CALL_SWEEP_INTERVAL_SECONDS", 60),
         followup_sweep_seconds=max(5, _env_int("FOLLOWUP_INTERVAL_MINUTES", 1) * 60),
+        prospect_search_enabled=_env_bool("PROSPECT_SEARCH_ENABLED", False),
+        prospect_search_frequency_hours=_env_int("PROSPECT_SEARCH_FREQUENCY_HOURS", 168),
+        prospect_search_max_per_month=_env_int("PROSPECT_SEARCH_MAX_PER_MONTH", 100),
     )
 
 
@@ -144,6 +147,10 @@ class ResolvedSettings:
     ai_emails_enabled: bool
     auto_call_sweep_seconds: int
     followup_sweep_seconds: int
+    # -- automated/scheduled prospect search (discovery only; never contacts) --
+    prospect_search_enabled: bool
+    prospect_search_frequency_hours: int   # how often each active saved search re-runs
+    prospect_search_max_per_month: int     # cap on automated searches/month (≤ 500)
 
     # -- derived timing helpers (shared by both sweeps) --
     def tzinfo(self):
@@ -210,6 +217,15 @@ def _from_row(row: Dict[str, Any]) -> ResolvedSettings:
         ai_emails_enabled=bool(row.get("ai_emails_enabled", d.ai_emails_enabled)),
         auto_call_sweep_seconds=int(row.get("auto_call_sweep_seconds") or d.auto_call_sweep_seconds),
         followup_sweep_seconds=int(row.get("followup_sweep_seconds") or d.followup_sweep_seconds),
+        prospect_search_enabled=bool(row.get("prospect_search_enabled", d.prospect_search_enabled)),
+        prospect_search_frequency_hours=int(
+            row.get("prospect_search_frequency_hours") or d.prospect_search_frequency_hours
+        ),
+        prospect_search_max_per_month=int(
+            row.get("prospect_search_max_per_month")
+            if row.get("prospect_search_max_per_month") is not None
+            else d.prospect_search_max_per_month
+        ),
     )
 
 
@@ -283,6 +299,10 @@ class SettingsPatch(BaseModel):
     ai_emails_enabled: Optional[bool] = None
     auto_call_sweep_seconds: Optional[int] = Field(default=None, ge=5, le=86400)
     followup_sweep_seconds: Optional[int] = Field(default=None, ge=5, le=86400)
+    # Automated prospect search: every 6h … once a month (744h); 0–500 searches/month.
+    prospect_search_enabled: Optional[bool] = None
+    prospect_search_frequency_hours: Optional[int] = Field(default=None, ge=6, le=744)
+    prospect_search_max_per_month: Optional[int] = Field(default=None, ge=0, le=500)
 
     @field_validator("quiet_start", "quiet_end")
     @classmethod
@@ -353,6 +373,7 @@ def _configured_flags() -> Dict[str, bool]:
         "bland_configured": bool(os.environ.get("BLAND_API_KEY")),
         "resend_configured": bool(os.environ.get("RESEND_API_KEY")),
         "ai_configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "rapidapi_configured": bool(os.environ.get("RAPIDAPI_KEY")),
         "supabase_configured": bool(
             os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         ),
