@@ -30,7 +30,7 @@ export default function Campaigns() {
                 <Button size="icon" variant="ghost" className="rounded-lg" onClick={() => toast.info("Campaign options")}><MoreHorizontal className="w-4 h-4" /></Button>
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-2 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-6">
               {[["Sent", c.sent.toLocaleString()], ["Open", `${c.open}%`], ["Reply", `${c.reply}%`], ["Meetings", c.meetings]].map(([k, v]) => (
                 <div key={k} className="text-center rounded-xl bg-neutral-50 dark:bg-neutral-800 py-3">
                   <p className="font-heading font-bold text-lg">{v}</p><p className="text-xs text-neutral-400">{k}</p>

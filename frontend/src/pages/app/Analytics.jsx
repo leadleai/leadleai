@@ -49,7 +49,7 @@ export default function Analytics() {
         subtitle={`Real performance across your leads, calls and emails · ${periodLabel}`}
         testid="analytics-header"
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <PeriodFilter value={period} onChange={setPeriod} />
             <Button data-testid="export-btn" variant="outline" className="rounded-full"
               onClick={exportCsv} disabled={!hasData}>

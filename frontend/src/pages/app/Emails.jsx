@@ -67,7 +67,7 @@ function EmailLog() {
           <Input data-testid="emails-search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by recipient or subject…" className="pl-9 rounded-xl" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["all", "sent", "failed"].map((s) => (
             <Button key={s} size="sm" data-testid={`emails-filter-${s}`}
               variant={status === s ? "default" : "outline"}

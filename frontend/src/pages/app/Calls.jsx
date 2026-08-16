@@ -87,7 +87,7 @@ function CallLog() {
           <Input data-testid="calls-search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by phone, lead or status…" className="pl-9 rounded-xl" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["all", "placed", "failed"].map((s) => (
             <Button key={s} size="sm" data-testid={`calls-filter-${s}`}
               variant={status === s ? "default" : "outline"}

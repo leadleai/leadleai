@@ -258,10 +258,11 @@ export default function DashboardLayout() {
           <button
             data-testid="global-search-trigger"
             onClick={() => setCmdOpen(true)}
-            className="flex items-center gap-2 flex-1 max-w-md h-10 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.03] px-3.5 text-sm text-muted-foreground hover:border-neutral-400 dark:hover:border-white/25 transition-colors"
+            className="flex items-center gap-2 flex-1 min-w-0 max-w-md h-10 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/[0.03] px-3.5 text-sm text-muted-foreground hover:border-neutral-400 dark:hover:border-white/25 transition-colors"
           >
-            <Search className="w-4 h-4" /> Search leads, companies, meetings...
-            <span className="ml-auto hidden sm:flex items-center gap-1 text-xs text-neutral-400"><Command className="w-3 h-3" />K</span>
+            <Search className="w-4 h-4 shrink-0" />
+            <span className="truncate">Search leads, companies, meetings...</span>
+            <span className="ml-auto hidden sm:flex items-center gap-1 text-xs text-neutral-400 shrink-0"><Command className="w-3 h-3" />K</span>
           </button>
 
           <div className="ml-auto flex items-center gap-1.5">
