@@ -41,6 +41,7 @@ import Analytics from "@/pages/app/Analytics";
 import Automation from "@/pages/app/Automation";
 import Agents from "@/pages/app/Agents";
 import KnowledgeBase from "@/pages/app/KnowledgeBase";
+import Widget from "@/pages/app/Widget";
 import Integrations from "@/pages/app/Integrations";
 import Settings from "@/pages/app/Settings";
 import Team from "@/pages/app/Team";
@@ -93,6 +94,7 @@ function App() {
               <Route path="automation" element={<Automation />} />
               <Route path="agents" element={<Agents />} />
               <Route path="knowledge" element={<KnowledgeBase />} />
+              <Route path="widget" element={<Widget />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
             </Route>

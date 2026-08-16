@@ -286,6 +286,23 @@ export const parseKeywords = (s) =>
     .filter((k, i, a) => a.indexOf(k) === i);
 export const keywordsToText = (arr) => (Array.isArray(arr) ? arr.join(", ") : "");
 
+// Website chat widget. Management is org-scoped (auth); the embed snippet uses
+// the returned widget_key against the PUBLIC endpoints served from API_BASE_URL.
+//   getConfig -> { widget_key, is_active, greeting_message, primary_color,
+//                  capture_fields:[...], monthly_message_cap, usage:{used,cap,remaining} }
+export const WIDGET_CAPTURE_FIELDS = ["name", "email", "phone"];
+
+export const widgetApi = {
+  getConfig: () => req("/api/widget/config"),
+  updateConfig: (patch) =>
+    req("/api/widget/config", { method: "PATCH", body: JSON.stringify(patch) }),
+  rotateKey: () => req("/api/widget/config/rotate-key", { method: "POST" }),
+  conversations: () => req("/api/widget/conversations"),
+  // The one-line <script> a business pastes onto their site.
+  embedSnippet: (widgetKey) =>
+    `<script src="${API_BASE_URL}/widget.js" data-widget-key="${widgetKey}" async></script>`,
+};
+
 export const aiEmailsApi = {
   getSettings: () => req("/api/settings/ai-emails"),
   setSettings: (enabled) =>

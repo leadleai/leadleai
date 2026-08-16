@@ -770,6 +770,20 @@ async def get_org_by_slug(slug: str) -> Optional[Dict[str, Any]]:
     return _one(resp.json())
 
 
+async def get_org_by_id(org_id: str) -> Optional[Dict[str, Any]]:
+    """Resolve an org id to its non-secret columns. Service mode — used by the
+    public widget endpoints, which have no authenticated caller."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/organizations",
+            headers=_headers(),
+            params={"id": f"eq.{org_id}", "select": "id,name,slug", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
 async def list_org_members(org_id: str, *, token: str) -> List[Dict[str, Any]]:
     url = _base_url()
     async with _client() as http:
@@ -1707,6 +1721,158 @@ async def count_prospect_search_runs_since(
         )
     _raise_for_error(resp)
     # Content-Range looks like "0-0/42" (or "*/0" when empty); the total is after '/'.
+    content_range = resp.headers.get("content-range") or resp.headers.get("Content-Range") or ""
+    total = content_range.split("/")[-1].strip()
+    try:
+        return int(total)
+    except (TypeError, ValueError):
+        return 0
+
+
+# ── Website chat widget ──────────────────────────────────────────────────────
+# The management reads/writes below run in USER mode (RLS scopes them to the
+# caller's org). The public-endpoint reads/writes run in SERVICE mode and pass an
+# explicit org_id resolved from the widget_key — nothing else is filtering.
+
+async def get_widget_config_by_org(org_id: str, *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """This org's single widget_config row, or None if it hasn't been created."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/widget_config",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "select": "*", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def create_widget_config(org_id: str, *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Create this org's widget_config with all defaults (incl. a random
+    widget_key from the column default). USER mode on the dashboard's first read."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/widget_config",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json={"org_id": org_id},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def update_widget_config(
+    fields: Dict[str, Any], *, org_id: str, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/widget_config",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params={"org_id": f"eq.{org_id}"},
+            json=fields,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def get_widget_config_by_key(widget_key: str) -> Optional[Dict[str, Any]]:
+    """Resolve a public widget_key to its config (incl. org_id). SERVICE mode by
+    necessity — the website visitor is anonymous."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/widget_config",
+            headers=_headers(),
+            params={"widget_key": f"eq.{widget_key}", "select": "*", "limit": "1"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def get_widget_conversation(widget_key: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """One visitor session's stored transcript, or None. SERVICE mode."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/widget_conversations",
+            headers=_headers(),
+            params={
+                "widget_key": f"eq.{widget_key}",
+                "session_id": f"eq.{session_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def upsert_widget_conversation(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Insert-or-update a conversation keyed on (widget_key, session_id). SERVICE
+    mode. Relies on the unique index widget_conversations_session_idx; PostgREST
+    resolves the conflict target from the columns present in the row."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/widget_conversations",
+            headers=_headers(None, {
+                "Prefer": "return=representation,resolution=merge-duplicates",
+            }),
+            params={"on_conflict": "widget_key,session_id"},
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_widget_conversations(
+    org_id: str, *, token: Optional[str] = None, limit: int = 200
+) -> List[Dict[str, Any]]:
+    """This org's widget conversations, newest first. USER mode (RLS) for the
+    dashboard."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/widget_conversations",
+            headers=_headers(token),
+            params={
+                "org_id": f"eq.{org_id}",
+                "select": "*",
+                "order": "created_at.desc",
+                "limit": str(limit),
+            },
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def insert_widget_message_log(row: Dict[str, Any]) -> None:
+    """Record one billable AI reply for the monthly-cap count. SERVICE mode."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/widget_message_log",
+            headers=_headers(None, {"Prefer": "return=minimal"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+
+
+async def count_widget_messages_since(
+    org_id: str, since_iso: str, *, token: Optional[str] = None
+) -> int:
+    """How many AI replies this org has sent at/after since_iso — the monthly-cap
+    count. Exact PostgREST count (Content-Range), never pulling the rows. SERVICE
+    mode for the public cap check; USER mode for the dashboard usage display."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/widget_message_log",
+            headers=_headers(token, {"Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0"}),
+            params={"org_id": f"eq.{org_id}", "created_at": f"gte.{since_iso}", "select": "id"},
+        )
+    _raise_for_error(resp)
     content_range = resp.headers.get("content-range") or resp.headers.get("Content-Range") or ""
     total = content_range.split("/")[-1].strip()
     try:

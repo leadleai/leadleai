@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -31,6 +31,8 @@ import followup
 import emails as emails_module
 import ai_email
 from knowledge import router as knowledge_router
+from widget import router as widget_router, public_router as widget_public_router
+from widget_js import WIDGET_JS
 from tags import router as tags_router, assign_router as lead_tags_router
 from notes import router as notes_router
 from custom_fields import router as custom_fields_router, values_router as lead_custom_fields_router
@@ -118,6 +120,12 @@ app.include_router(followup.settings_router)
 app.include_router(emails_module.router)
 # Per-org knowledge base (grounds the AI follow-up writer) + its on/off toggle.
 app.include_router(knowledge_router)
+# Embeddable AI chat widget. MANAGEMENT (auth) config + conversations, and the
+# PUBLIC (widget_key, no auth) message/capture/config endpoints called from any
+# website. The public endpoints — and /widget.js below — are the ONLY surfaces
+# opened to arbitrary origins; see the scoped-CORS middleware further down.
+app.include_router(widget_router)
+app.include_router(widget_public_router)
 app.include_router(ai_email.settings_router)
 # Lead tags (per-org library + assign/unassign), notes, and custom fields
 # (per-org definitions + per-lead values). All authenticated and org-scoped.
@@ -144,6 +152,35 @@ app.include_router(cron_router)
 # Public, unauthenticated visitor-country lookup for DISPLAY-ONLY currency on the
 # marketing pricing page. Cosmetic — never touches billing; always falls back safely.
 app.include_router(geo_router)
+
+
+# The self-contained embeddable widget script. Served at the ROOT (not /api) so
+# the one-line <script src="…/widget.js"> tag is clean. Public + cacheable; the
+# scoped-CORS middleware below opens it (and the public widget API) to any origin.
+@app.get("/widget.js", include_in_schema=False)
+async def widget_js() -> Response:
+    return Response(
+        content=WIDGET_JS,
+        media_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+def _is_public_widget_path(path: str) -> bool:
+    """Exactly the surfaces that must work from ANY website: /widget.js and the
+    three PUBLIC widget endpoints /api/widget/{key}/{message|capture|config}.
+    The MANAGEMENT routes /api/widget/config, /api/widget/conversations and
+    /api/widget/config/rotate-key are 3-part or end in 'rotate-key', so they are
+    deliberately NOT matched and stay under the locked-down global CORS policy."""
+    if path == "/widget.js":
+        return True
+    parts = path.strip("/").split("/")
+    return (
+        len(parts) == 4
+        and parts[0] == "api"
+        and parts[1] == "widget"
+        and parts[3] in ("message", "capture", "config")
+    )
 
 
 @app.on_event("startup")
@@ -175,6 +212,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Registered AFTER the global CORSMiddleware, so it is the OUTERMOST middleware
+# and gets first crack at every request. That ordering is what lets it answer the
+# cross-origin PREFLIGHT for the public widget surfaces itself — before the global
+# CORS layer (which would reject a non-allowlisted origin) ever sees it. Only the
+# public widget paths are opened here; every other route keeps the locked-down
+# global policy above.
+@app.middleware("http")
+async def widget_public_cors(request: Request, call_next):
+    if not _is_public_widget_path(request.url.path):
+        return await call_next(request)
+    if request.method == "OPTIONS":
+        resp = Response(status_code=200)
+    else:
+        resp = await call_next(request)
+    # No credentials are ever used on these endpoints, so '*' is correct and lets
+    # the response be cached across origins.
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    resp.headers["Access-Control-Max-Age"] = "86400"
+    return resp
+
 
 # Configure logging
 logging.basicConfig(
