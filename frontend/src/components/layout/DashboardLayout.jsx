@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, Users, UsersRound, Microscope, Megaphone, Mail, Phone, CalendarClock,
+  LayoutDashboard, Users, UsersRound, Microscope, Radar, Megaphone, Mail, Phone, CalendarClock,
   Kanban, BarChart3, Workflow, BookOpen, Bot, Plug, MessageCircle, Settings as SettingsIcon,
   Search, Bell, Sparkles, Sun, Moon, Menu, X, Send, Command, ChevronDown, Check
 } from "lucide-react";
@@ -27,6 +27,7 @@ const nav = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/app" },
   { label: "Leads", icon: Users, path: "/app/leads" },
   { label: "Prospects", icon: Microscope, path: "/app/prospects" },
+  { label: "Market Watch", icon: Radar, path: "/app/market-watch" },
   { label: "Team", icon: UsersRound, path: "/app/team" },
   { label: "Campaigns", icon: Megaphone, path: "/app/campaigns" },
   { label: "Emails", icon: Mail, path: "/app/emails" },

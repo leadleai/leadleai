@@ -26,6 +26,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 import auto_call
+import competitors
 import followup
 import prospects
 
@@ -74,3 +75,15 @@ async def prospect_search_sweep(_: bool = Depends(require_cron_secret)):
     result = await prospects.run_prospect_search_sweep()
     logger.info("cron: prospect-search-sweep result: %s", result)
     return {"job": "prospect-search-sweep", **result}
+
+
+@router.post("/competitor-sweep")
+async def competitor_sweep(_: bool = Depends(require_cron_secret)):
+    """Run one competitor-intel sweep: for each org with the feature on, re-analyse
+    every active competitor whose check interval has elapsed (up to the monthly cap),
+    calling Anthropic WITH WEB SEARCH and storing an insight. No-ops cleanly when
+    ANTHROPIC_API_KEY is unset (graceful dormancy)."""
+    logger.info("cron: competitor-sweep triggered")
+    result = await competitors.run_competitor_sweep()
+    logger.info("cron: competitor-sweep result: %s", result)
+    return {"job": "competitor-sweep", **result}

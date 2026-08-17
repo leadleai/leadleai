@@ -1729,6 +1729,195 @@ async def count_prospect_search_runs_since(
         return 0
 
 
+# ── Competitor / market intelligence ─────────────────────────────────────────
+# User mode (RLS) on the request path; service mode (explicit org_id, no token)
+# for the background sweep (list_active_competitors / insert_competitor_insight /
+# touch_competitor_checked).
+async def list_competitors(
+    *, org_id: str, token: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """This org's competitors, newest first."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "select": "*", "order": "created_at.desc"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def get_competitor(
+    competitor_id: str, *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{competitor_id}", "select": "*", "limit": "1"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/competitors", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def insert_competitor(row: Dict[str, Any], *, token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def update_competitor_fields(
+    competitor_id: str, fields: Dict[str, Any], *, org_id: Optional[str] = None, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    url = _base_url()
+    params = {"id": f"eq.{competitor_id}"}
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params=params,
+            json=fields,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def delete_competitor(
+    competitor_id: str, *, org_id: str, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Delete a competitor. Its insights cascade away (FK on delete)."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.delete(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{competitor_id}", "org_id": f"eq.{org_id}"},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def touch_competitor_checked(competitor_id: str, now_iso: str) -> Optional[Dict[str, Any]]:
+    """Stamp last_checked_at after an analysis runs. Service mode (background
+    sweep). On the request path the CRUD update path handles this instead."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.patch(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(None, {"Prefer": "return=representation"}),
+            params={"id": f"eq.{competitor_id}"},
+            json={"last_checked_at": now_iso},
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_active_competitors() -> List[Dict[str, Any]]:
+    """EVERY org's ACTIVE competitors. Service mode (no user session): the
+    competitor-sweep calls this once per pass, groups by org_id, and — using each
+    org's LIVE settings — analyses the ones whose interval has elapsed."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/competitors",
+            headers=_headers(),
+            params={"is_active": "eq.true", "select": "*", "limit": "100000"},
+        )
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def insert_competitor_insight(
+    row: Dict[str, Any], *, token: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Store one AI insight. USER mode on the request path (manual "check now");
+    SERVICE mode (no token) for the sweep. One row == one billed AI run."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.post(
+            f"{url}/rest/v1/competitor_insights",
+            headers=_headers(token, {"Prefer": "return=representation"}),
+            json=row,
+        )
+    _raise_for_error(resp)
+    return _one(resp.json())
+
+
+async def list_competitor_insights(
+    competitor_id: str, *, org_id: Optional[str] = None, token: Optional[str] = None, limit: int = 20
+) -> List[Dict[str, Any]]:
+    """One competitor's insights, newest first."""
+    url = _base_url()
+    params = {
+        "competitor_id": f"eq.{competitor_id}",
+        "select": "*",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    }
+    if org_id:
+        params["org_id"] = f"eq.{org_id}"
+    async with _client() as http:
+        resp = await http.get(f"{url}/rest/v1/competitor_insights", headers=_headers(token), params=params)
+    _raise_for_error(resp)
+    return resp.json()
+
+
+async def list_latest_competitor_insights(
+    *, org_id: str, token: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """The single most-recent insight for EACH of this org's competitors, in one
+    round trip. PostgREST doesn't do DISTINCT ON, so we pull the org's insights
+    newest-first and keep the first row seen per competitor_id here. Bounded by a
+    generous limit; the Market Watch page only renders the latest per competitor."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/competitor_insights",
+            headers=_headers(token),
+            params={"org_id": f"eq.{org_id}", "select": "*",
+                    "order": "created_at.desc", "limit": "2000"},
+        )
+    _raise_for_error(resp)
+    latest: Dict[str, Dict[str, Any]] = {}
+    for row in resp.json():
+        cid = row.get("competitor_id")
+        if cid and cid not in latest:
+            latest[cid] = row
+    return list(latest.values())
+
+
+async def count_competitor_insights_since(
+    org_id: str, since_iso: str, *, token: Optional[str] = None
+) -> int:
+    """How many insights this org has generated at/after since_iso — the monthly
+    AI-run quota count. Uses PostgREST's exact count (Content-Range header) so we
+    never pull the rows. USER mode (RLS) for the usage endpoint; SERVICE mode
+    (explicit org_id, no token) for the sweep's pre-flight quota check."""
+    url = _base_url()
+    async with _client() as http:
+        resp = await http.get(
+            f"{url}/rest/v1/competitor_insights",
+            headers=_headers(token, {"Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0"}),
+            params={"org_id": f"eq.{org_id}", "created_at": f"gte.{since_iso}", "select": "id"},
+        )
+    _raise_for_error(resp)
+    content_range = resp.headers.get("content-range") or resp.headers.get("Content-Range") or ""
+    total = content_range.split("/")[-1].strip()
+    try:
+        return int(total)
+    except (TypeError, ValueError):
+        return 0
+
+
 # ── Website chat widget ──────────────────────────────────────────────────────
 # The management reads/writes below run in USER mode (RLS scopes them to the
 # caller's org). The public-endpoint reads/writes run in SERVICE mode and pass an

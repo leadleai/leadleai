@@ -237,6 +237,28 @@ export const savedSearchesApi = {
   usage: () => req("/api/saved-searches/usage"),
 };
 
+// Competitor / market intelligence. An org tracks competitors (name + website);
+// the backend uses Anthropic WITH WEB SEARCH to summarise each one's recent
+// activity into an insight (summary + key points + source links). The AI key is
+// backend-only and the feature is gracefully DORMANT until it's set — `list` and
+// `usage` return `ai_configured` so the UI shows an "add your key" state rather
+// than a broken button. Analysis is billed per run and capped per org per month.
+//   list  -> { competitors:[{ …, latest_insight:{summary,details,source_urls,created_at} }], ai_configured }
+//   check -> { ran, configured, insight? } | { ran:false, configured:false, message }
+export const competitorsApi = {
+  list: () => req("/api/competitors"),
+  create: ({ name, website, notes }) =>
+    req("/api/competitors", { method: "POST", body: JSON.stringify({ name, website, notes }) }),
+  update: (id, patch) =>
+    req(`/api/competitors/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  remove: (id) => req(`/api/competitors/${id}`, { method: "DELETE" }),
+  insights: (id) => req(`/api/competitors/${id}/insights`),
+  // Run the AI analysis now (respects the monthly cap; 200 with configured:false
+  // when the key is absent, so the caller shows the dormant state, not an error).
+  check: (id) => req(`/api/competitors/${id}/check`, { method: "POST" }),
+  usage: () => req("/api/competitors/usage"),
+};
+
 export const followupApi = {
   getSettings: () => req("/api/settings/followup"),
   setSettings: (enabled) =>

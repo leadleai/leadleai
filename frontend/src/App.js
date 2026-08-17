@@ -33,6 +33,7 @@ import Dashboard from "@/pages/app/Dashboard";
 import Leads from "@/pages/app/Leads";
 import LeadDetail from "@/pages/app/LeadDetail";
 import Prospects from "@/pages/app/Prospects";
+import MarketWatch from "@/pages/app/MarketWatch";
 import Campaigns from "@/pages/app/Campaigns";
 import Emails from "@/pages/app/Emails";
 import Calls from "@/pages/app/Calls";
@@ -86,6 +87,7 @@ function App() {
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="prospects" element={<Prospects />} />
+              <Route path="market-watch" element={<MarketWatch />} />
               <Route path="campaigns" element={<Campaigns />} />
               <Route path="emails" element={<Emails />} />
               <Route path="calls" element={<Calls />} />

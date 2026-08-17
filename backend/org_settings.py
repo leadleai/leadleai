@@ -126,6 +126,9 @@ def env_defaults() -> "ResolvedSettings":
         prospect_search_enabled=_env_bool("PROSPECT_SEARCH_ENABLED", False),
         prospect_search_frequency_hours=_env_int("PROSPECT_SEARCH_FREQUENCY_HOURS", 168),
         prospect_search_max_per_month=_env_int("PROSPECT_SEARCH_MAX_PER_MONTH", 100),
+        competitor_intel_enabled=_env_bool("COMPETITOR_INTEL_ENABLED", False),
+        competitor_check_frequency_hours=_env_int("COMPETITOR_CHECK_FREQUENCY_HOURS", 168),
+        competitor_max_per_month=_env_int("COMPETITOR_MAX_PER_MONTH", 100),
     )
 
 
@@ -151,6 +154,10 @@ class ResolvedSettings:
     prospect_search_enabled: bool
     prospect_search_frequency_hours: int   # how often each active saved search re-runs
     prospect_search_max_per_month: int     # cap on automated searches/month (≤ 500)
+    # -- competitor / market intelligence (AI web-search summaries; billed per run) --
+    competitor_intel_enabled: bool
+    competitor_check_frequency_hours: int  # how often each active competitor is re-checked
+    competitor_max_per_month: int          # cap on AI analysis runs/month (cost control)
 
     # -- derived timing helpers (shared by both sweeps) --
     def tzinfo(self):
@@ -225,6 +232,15 @@ def _from_row(row: Dict[str, Any]) -> ResolvedSettings:
             row.get("prospect_search_max_per_month")
             if row.get("prospect_search_max_per_month") is not None
             else d.prospect_search_max_per_month
+        ),
+        competitor_intel_enabled=bool(row.get("competitor_intel_enabled", d.competitor_intel_enabled)),
+        competitor_check_frequency_hours=int(
+            row.get("competitor_check_frequency_hours") or d.competitor_check_frequency_hours
+        ),
+        competitor_max_per_month=int(
+            row.get("competitor_max_per_month")
+            if row.get("competitor_max_per_month") is not None
+            else d.competitor_max_per_month
         ),
     )
 
@@ -303,6 +319,10 @@ class SettingsPatch(BaseModel):
     prospect_search_enabled: Optional[bool] = None
     prospect_search_frequency_hours: Optional[int] = Field(default=None, ge=6, le=744)
     prospect_search_max_per_month: Optional[int] = Field(default=None, ge=0, le=500)
+    # Competitor intel: every 6h … once a month (744h); AI runs/month cap (cost control).
+    competitor_intel_enabled: Optional[bool] = None
+    competitor_check_frequency_hours: Optional[int] = Field(default=None, ge=6, le=744)
+    competitor_max_per_month: Optional[int] = Field(default=None, ge=0, le=5000)
 
     @field_validator("quiet_start", "quiet_end")
     @classmethod

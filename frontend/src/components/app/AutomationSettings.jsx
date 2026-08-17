@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   PhoneCall, Mail, Clock, Sparkles, Search, Loader2, AlertTriangle,
-  Save, RotateCcw, Timer, Gauge, Microscope,
+  Save, RotateCcw, Timer, Gauge, Microscope, Radar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { orgSettingsApi, savedSearchesApi } from "@/lib/backend";
+import { orgSettingsApi, savedSearchesApi, competitorsApi } from "@/lib/backend";
 import { toast } from "sonner";
 
 // The fields this editor owns (everything the sweeps read per-org). Deployment
@@ -21,6 +21,7 @@ const EDITABLE = [
   "agent_name", "kb_matching_enabled", "ai_emails_enabled",
   "auto_call_sweep_seconds", "followup_sweep_seconds",
   "prospect_search_enabled", "prospect_search_frequency_hours", "prospect_search_max_per_month",
+  "competitor_intel_enabled", "competitor_check_frequency_hours", "competitor_max_per_month",
 ];
 
 // Discrete frequency stops for the automated-prospect-search slider, from "every
@@ -96,6 +97,9 @@ export default function AutomationSettings() {
   // Automated-prospect-search usage: active saved-search count + this month's runs.
   // Drives the LIVE credit estimate under the frequency slider.
   const [usage, setUsage] = useState(null);
+  // Competitor-intel usage: active competitor count + this month's AI runs + whether
+  // the Anthropic key is set (ai_configured). Drives the estimate + dormant warning.
+  const [compUsage, setCompUsage] = useState(null);
 
   const load = async () => {
     setState("loading"); setError(null);
@@ -109,6 +113,7 @@ export default function AutomationSettings() {
     } catch (e) { setError(e.message); setState("error"); }
     // Usage is best-effort — the rest of the editor must still render if it fails.
     try { setUsage(await savedSearchesApi.usage()); } catch { /* ignore */ }
+    try { setCompUsage(await competitorsApi.usage()); } catch { /* ignore */ }
   };
   useEffect(() => { load(); }, []);
 
@@ -139,6 +144,24 @@ export default function AutomationSettings() {
       over: projected > cap || projected > FREE_TIER_MONTHLY_LIMIT,
     };
   }, [form?.prospect_search_frequency_hours, form?.prospect_search_max_per_month, usage]);
+
+  // LIVE AI-run estimate for competitor intel — same reckoning as the sweep:
+  //   runs/month    = AVG_HOURS_PER_MONTH / frequency_hours
+  //   projected use = active competitors × runs/month
+  const compEstimate = useMemo(() => {
+    const freq = Number(form?.competitor_check_frequency_hours) || 168;
+    const active = compUsage?.active_competitor_count ?? 0;
+    const runsPerMonth = AVG_HOURS_PER_MONTH / freq;
+    const projected = Math.round(active * runsPerMonth);
+    const cap = Number(form?.competitor_max_per_month) || 0;
+    return {
+      active,
+      runsPerMonth: Math.round(runsPerMonth * 10) / 10,
+      projected,
+      cap,
+      over: cap > 0 && projected > cap,
+    };
+  }, [form?.competitor_check_frequency_hours, form?.competitor_max_per_month, compUsage]);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const setNum = (key, value) => set(key, value === "" ? "" : Number(value));
@@ -174,6 +197,7 @@ export default function AutomationSettings() {
         description: "Takes effect on the next sweep — no restart needed.",
       });
       try { setUsage(await savedSearchesApi.usage()); } catch { /* best-effort */ }
+      try { setCompUsage(await competitorsApi.usage()); } catch { /* best-effort */ }
     } catch (e) {
       toast.error("Couldn’t save settings", { description: e.message });
     } finally { setSaving(false); }
@@ -354,6 +378,74 @@ export default function AutomationSettings() {
         <Field label="Monthly search cap" hint={`Hard limit on automated searches per month (max ${FREE_TIER_MONTHLY_LIMIT} — the API free tier).`} className="pt-1">
           <NumberInput value={form.prospect_search_max_per_month} min={0} max={FREE_TIER_MONTHLY_LIMIT}
             onChange={(v) => setNum("prospect_search_max_per_month", v)} suffix="/mo" testid="prospect-cap-input" />
+        </Field>
+      </Card>
+
+      {/* Competitor / market intelligence */}
+      <Card>
+        <CardHead icon={Radar} title="Competitor intelligence"
+          desc="Re-check your tracked competitors on a schedule. AI searches the web for each one's recent activity and stores a fresh summary in Market Watch. Each check is billed, so a monthly cap keeps costs predictable." />
+        <ToggleRow label="Enable automated competitor checks" checked={!!form.competitor_intel_enabled}
+          onChange={(v) => set("competitor_intel_enabled", v)}
+          disabled={compUsage && !compUsage.ai_configured}
+          badge={form.competitor_intel_enabled ? "ON" : "OFF"} />
+        {compUsage && !compUsage.ai_configured && (
+          <Warn>AI not configured — add ANTHROPIC_API_KEY in backend/.env to enable competitor intelligence. You can still add competitors in Market Watch; checks start once the key is set.</Warn>
+        )}
+
+        {/* Frequency slider */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">How often each competitor is re-checked</Label>
+            <span className="text-sm font-medium" data-testid="competitor-freq-label">
+              {FREQ_STOPS[freqToIndex(form.competitor_check_frequency_hours)].label}
+            </span>
+          </div>
+          <Slider
+            className="mt-3"
+            data-testid="competitor-freq-slider"
+            min={0} max={FREQ_STOPS.length - 1} step={1}
+            value={[freqToIndex(form.competitor_check_frequency_hours)]}
+            onValueChange={([i]) => set("competitor_check_frequency_hours", FREQ_STOPS[i].hours)}
+          />
+          <div className="mt-1 flex justify-between text-[11px] text-neutral-400">
+            <span>Every 6 hours</span>
+            <span>Once a month</span>
+          </div>
+
+          {/* LIVE AI-run estimate — recomputes as the slider moves */}
+          <p
+            data-testid="competitor-estimate"
+            className={`mt-3 text-sm flex items-start gap-1.5 ${
+              compEstimate.over ? "text-red-600 dark:text-red-400 font-medium" : "text-neutral-500 dark:text-neutral-400"
+            }`}>
+            <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            {compEstimate.active === 0 ? (
+              <span>
+                No active competitors yet — add some from the{" "}
+                <a href="/app/market-watch" className="underline underline-offset-2">Market Watch</a> page.
+                Once you do, this shows how many AI checks the schedule will use each month.
+              </span>
+            ) : (
+              <span>
+                At this frequency with your {compEstimate.active} active{" "}
+                {compEstimate.active === 1 ? "competitor" : "competitors"}, this will run about{" "}
+                <strong>~{compEstimate.projected}</strong> AI {compEstimate.projected === 1 ? "check" : "checks"} per month
+                ({compEstimate.runsPerMonth} per competitor).
+                {compEstimate.over && " That exceeds your cap — lower the frequency, pause some competitors, or raise the cap."}
+              </span>
+            )}
+          </p>
+          {compUsage && (
+            <p className="mt-1 text-xs text-neutral-400" data-testid="competitor-usage">
+              {compUsage.used} of {compUsage.max_per_month} AI checks used so far this month · {compUsage.remaining} remaining.
+            </p>
+          )}
+        </div>
+
+        <Field label="Monthly AI-check cap" hint="Hard limit on billed competitor analyses per month." className="pt-1">
+          <NumberInput value={form.competitor_max_per_month} min={0} max={5000}
+            onChange={(v) => setNum("competitor_max_per_month", v)} suffix="/mo" testid="competitor-cap-input" />
         </Field>
       </Card>
 

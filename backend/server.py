@@ -22,6 +22,7 @@ from leads import router as leads_router
 from lead_import import router as lead_import_router
 from prospects import router as prospects_router
 from saved_searches import router as saved_searches_router
+from competitors import router as competitors_router
 from calls import router as calls_router, log_router as call_log_router
 from auto_call import settings_router
 from crm.router import router as crm_router
@@ -106,6 +107,11 @@ app.include_router(prospects_router)
 # Scheduled/automated prospect searches (CRUD + monthly usage). Timing lives in
 # org_settings; the sweep is prospects.run_prospect_search_sweep via cron.
 app.include_router(saved_searches_router)
+# Competitor / market intelligence: per-org CRUD for tracked competitors + AI
+# web-search analysis into stored insights (org-scoped, RLS). AI is backend-only and
+# gracefully DORMANT until ANTHROPIC_API_KEY is set; the scheduled sweep runs via
+# competitors.run_competitor_sweep (cron /api/cron/competitor-sweep).
+app.include_router(competitors_router)
 app.include_router(calls_router)
 # Call history (call_log), newest first.
 app.include_router(call_log_router)
