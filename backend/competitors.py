@@ -2,27 +2,37 @@
 COMPETITOR / MARKET INTELLIGENCE.
 
 An org adds COMPETITORS (name + website). On a schedule — and on demand via a
-"check now" button — this asks Anthropic, WITH THE WEB SEARCH TOOL enabled, to
-find recent news / offers / pricing / product / hiring activity about each
-competitor, then summarises it into a clean INSIGHT:
+"check now" button — this asks the AI provider (Groq/Llama by default) to profile
+each competitor from its name / website / user notes and summarise it into a clean
+INSIGHT:
 
-    summary        one short paragraph of what's new
+    summary        one short paragraph profiling the competitor
     key_points     3–6 crisp bullets
-    source_urls    the web pages the model actually cited
+    source_urls    always [] under Groq (no live search — see NOTE below)
+
+NOTE — NO LIVE WEB SEARCH: the previous provider (Gemini) grounded these insights
+with live Google Search. Groq/Llama has NO server-side web search, so insights are
+now generated from the MODEL'S OWN TRAINING KNOWLEDGE — general and possibly out of
+date, not live news. We make this explicit: every insight carries
+details.live_search=False and a plain-language disclaimer appended to the summary,
+so the Market Watch UI shows it isn't live-searching. (details.source_urls stays
+empty, which the UI already renders as "no sources".)
 
 Insights are stored (public.competitor_insights) so the Market Watch dashboard can
 show the latest one per competitor and when it was last checked.
 
-COST CONTROL — the Anthropic call is the ONLY thing that costs money, so:
-  * a cost-conscious model (claude-haiku / sonnet, configurable) is used,
+COST CONTROL — the AI call is the ONLY thing that consumes quota, so:
+  * a cost-conscious model (free tier, configurable) is used,
   * each competitor is re-checked at most every competitor_check_frequency_hours,
   * and a per-org MONTHLY CAP (competitor_max_per_month) bounds total AI runs.
-Each stored insight == one billed run, so this month's usage is simply
+Each stored insight == one run, so this month's usage is simply
 count(competitor_insights since the start of the calendar month) for the org.
+A free-tier rate-limit (429) is surfaced as a normal analysis error so the run
+isn't stamped and retries later, rather than crashing the sweep.
 
-GRACEFUL DORMANCY — the whole feature is READY but dormant until ANTHROPIC_API_KEY
+GRACEFUL DORMANCY — the whole feature is READY but dormant until GROQ_API_KEY
 is set. With no key: CRUD + the dashboard work normally, and any analysis (manual
-"check now" or the sweep) returns a clear "AI not configured — add ANTHROPIC_API_KEY
+"check now" or the sweep) returns a clear "AI not configured — add GROQ_API_KEY
 to enable competitor intelligence" message instead of erroring. `ai_configured` is
 surfaced to the UI so it can show that state rather than a broken button.
 
@@ -45,10 +55,10 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+import ai_provider
 import org_settings
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
@@ -56,23 +66,21 @@ from auth import OrgContext, require_org, sb_error
 logger = logging.getLogger("competitors")
 router = APIRouter(prefix="/api/competitors", tags=["competitors"])
 
-# ── Anthropic config (mirrors ai_email.py; key is backend-only, never the browser) ─
-ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_VERSION = "2023-06-01"
-# Cost-conscious default. Override with ANTHROPIC_COMPETITOR_MODEL, else the shared
-# ANTHROPIC_MODEL, else this. Haiku is the cheapest capable option for this job.
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-# The basic web-search tool variant — works on every current model (Haiku included)
-# and needs no beta header, so it stays compatible with anthropic-version 2023-06-01.
-WEB_SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 5}
+# ── AI config (key is backend-only, never the browser) ───────────────────────
 # Bounded so one analysis stays cheap and predictable.
 MAX_TOKENS = 1024
 REQUEST_TIMEOUT_SECONDS = 90.0
-MAX_TURNS = 4  # server-side web-search loops can emit stop_reason=pause_turn; resume a few times
 
 # The message the UI shows (and the sweep logs) when the key isn't set.
 NOT_CONFIGURED_MESSAGE = (
-    "AI not configured — add ANTHROPIC_API_KEY to enable competitor intelligence."
+    "AI not configured — add GROQ_API_KEY to enable competitor intelligence."
+)
+
+# Appended to every summary so the dashboard makes clear these insights are NOT a
+# live web search (Groq/Llama has none) but the model's own general knowledge.
+LIVE_SEARCH_DISCLAIMER = (
+    "Note: this profile is generated from the AI model's general knowledge, not a "
+    "live web search, so it may be out of date."
 )
 
 # A month is reckoned as this many hours (365.25/12*24 ≈ 730.5), matching the
@@ -81,20 +89,13 @@ AVG_HOURS_PER_MONTH = 730.0
 
 
 # ── config helpers ───────────────────────────────────────────────────────────
-def _api_key() -> str:
-    return os.environ.get("ANTHROPIC_API_KEY", "").strip()
-
-
 def api_configured() -> bool:
-    return bool(_api_key())
+    return ai_provider.api_configured()
 
 
 def model() -> str:
-    return (
-        os.environ.get("ANTHROPIC_COMPETITOR_MODEL", "").strip()
-        or os.environ.get("ANTHROPIC_MODEL", "").strip()
-        or DEFAULT_MODEL
-    )
+    # COMPETITOR_MODEL pins this surface if set; else the shared provider default.
+    return os.environ.get("COMPETITOR_MODEL", "").strip() or ai_provider.default_model()
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -135,40 +136,41 @@ class CompetitorOut(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# THE AI ANALYSIS — Anthropic Messages API with the WEB SEARCH tool enabled.
+# THE AI ANALYSIS — one AI call, NO live web search (Groq/Llama has none).
 # ─────────────────────────────────────────────────────────────────────────────
-# How web search is used: we send ONE request with the web_search tool available.
-# Anthropic runs the searches SERVER-SIDE — the model decides what to query (recent
-# news, offers, pricing, launches for this competitor), reads the results, and
-# writes a grounded summary. The response contains `web_search_tool_result` blocks
-# (the pages it fetched, each with a url + title) and `text` blocks (its answer,
-# with citations). We collect the cited URLs from those result blocks and parse a
-# small JSON object (summary + key_points) from the final text.
+# We send ONE request describing the competitor (name / website / user notes) and
+# ask the model to profile it from its OWN training knowledge. There is no live
+# search and therefore no cited sources (result.sources is always empty), so the
+# prompt forbids fabricating specific recent events/dates, and the stored summary
+# carries an explicit "not a live web search" disclaimer for the dashboard. We
+# parse a small JSON object (summary + key_points + activity_level) from the text.
+# (Grounded live search was Gemini-specific; to restore it, set PROVIDER=gemini and
+# re-enable search=True below — the Gemini client still collects grounding sources.)
 # ═════════════════════════════════════════════════════════════════════════════
 _SYSTEM = (
-    "You are a market-intelligence analyst. Using the web search tool, research the "
-    "SPECIFIED competitor company and report only what is RECENT and material — news, "
-    "product launches, pricing changes, promotions/offers, funding, partnerships, "
-    "notable hiring, or market moves from roughly the last few months. Prefer primary "
-    "and reputable sources. Do NOT invent facts: if you can't verify something, leave "
-    "it out. If searches turn up nothing recent, say so plainly. "
-    "After researching, respond with ONLY a JSON object (no prose around it), shaped "
-    'exactly as: {"summary": "<2-4 sentence overview of what is new>", '
+    "You are a market-intelligence analyst. You do NOT have live web access, so work "
+    "ONLY from what you already know about the SPECIFIED competitor company from the "
+    "name, website, and any context provided. Give a concise general profile: what the "
+    "company does, its market/positioning, typical products or services, and likely "
+    "strengths or weaknesses. Do NOT fabricate specific recent events, dates, prices, "
+    "funding rounds, or news — if you are unsure or your knowledge may be outdated, say "
+    "so plainly and keep to durable, general facts. "
+    "Respond with ONLY a JSON object (no prose around it), shaped exactly as: "
+    '{"summary": "<2-4 sentence profile of the company>", '
     '"key_points": ["<short bullet>", "..."], '
     '"activity_level": "<one of: high, moderate, low, none>"}. '
-    "Keep key_points to 3-6 crisp, factual bullets. Cite via the search tool; the "
-    "source links are collected automatically, so do not put URLs in the JSON."
+    "Keep key_points to 3-6 crisp bullets. Do not put URLs in the JSON."
 )
 
 
 def _build_user_prompt(*, name: str, website: Optional[str], notes: Optional[str]) -> str:
-    lines = [f"COMPETITOR TO RESEARCH: {name}"]
+    lines = [f"COMPETITOR TO PROFILE: {name}"]
     if website:
         lines.append(f"WEBSITE: {website}")
     if notes:
         lines.append(f"CONTEXT (from the user, may help disambiguate): {notes.strip()}")
     lines.append(
-        "\nSearch the web for this company's recent activity and return the JSON object "
+        "\nProfile this company from your own knowledge and return the JSON object "
         "described in the system prompt."
     )
     return "\n".join(lines)
@@ -195,81 +197,41 @@ def _extract_json(text: str) -> Optional[dict]:
     return None
 
 
-def _collect_from_content(blocks: List[Dict[str, Any]], texts: List[str], sources: List[Dict[str, str]]) -> None:
-    """Pull text and web-search source URLs out of one message's content blocks."""
-    seen = {s["url"] for s in sources}
-    for b in blocks or []:
-        btype = b.get("type")
-        if btype == "text":
-            texts.append(b.get("text", ""))
-        elif btype == "web_search_tool_result":
-            for item in b.get("content", []) or []:
-                if item.get("type") == "web_search_result":
-                    url = (item.get("url") or "").strip()
-                    if url and url not in seen:
-                        seen.add(url)
-                        sources.append({"url": url, "title": (item.get("title") or "").strip()})
-
-
 async def analyze_competitor(
     *, name: str, website: Optional[str] = None, notes: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Research one competitor via Anthropic + web search and return a result dict.
+    """Profile one competitor via the AI provider (Groq, no live search), returning a dict.
 
     NEVER raises — the caller (request path or sweep) always gets a structured dict:
 
       {"configured": False, "message": NOT_CONFIGURED_MESSAGE}      # no API key
       {"configured": True, "insight": {summary, details, source_urls}}  # success
-      {"configured": True, "insight": None, "error": "<why>"}       # API/parse error
+      {"configured": True, "insight": None, "error": "<why>"}       # API/parse/429 error
 
-    `insight` is exactly the shape stored in competitor_insights.
+    `insight` is exactly the shape stored in competitor_insights (source_urls is []
+    since there is no live search under Groq).
     """
     if not api_configured():
         return {"configured": False, "message": NOT_CONFIGURED_MESSAGE}
 
     used_model = model()
-    headers = {
-        "x-api-key": _api_key(),
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-    messages: List[Dict[str, Any]] = [
-        {"role": "user", "content": _build_user_prompt(name=name, website=website, notes=notes)}
-    ]
-    texts: List[str] = []
-    sources: List[Dict[str, str]] = []
+    result = await ai_provider.generate(
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": _build_user_prompt(name=name, website=website, notes=notes)}],
+        model=used_model,
+        max_output_tokens=MAX_TOKENS,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    if not result.ok:
+        # Includes the free-tier 429: surface as an error (no insight) so the run
+        # isn't stamped and retries on the next manual check / sweep.
+        logger.warning("competitor analyze: '%s' failed: %s", name, result.error)
+        return {"configured": True, "insight": None, "error": result.error or "AI analysis failed."}
 
-    try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as http:
-            for _turn in range(MAX_TURNS):
-                payload = {
-                    "model": used_model,
-                    "max_tokens": MAX_TOKENS,
-                    "system": _SYSTEM,
-                    "tools": [WEB_SEARCH_TOOL],
-                    "messages": messages,
-                }
-                resp = await http.post(ANTHROPIC_URL, headers=headers, json=payload)
-                if resp.status_code >= 400:
-                    logger.error("competitor analyze: Anthropic HTTP %s: %s", resp.status_code, resp.text[:300])
-                    return {"configured": True, "insight": None,
-                            "error": f"AI request failed (HTTP {resp.status_code})."}
-                data = resp.json()
-                content = data.get("content") or []
-                _collect_from_content(content, texts, sources)
-                # web search runs server-side; if it paused mid-loop, feed the
-                # assistant turn back and continue so it can finish its answer.
-                if data.get("stop_reason") == "pause_turn":
-                    messages.append({"role": "assistant", "content": content})
-                    continue
-                break
-    except Exception as e:
-        logger.error("competitor analyze: request to Anthropic failed: %s", e)
-        return {"configured": True, "insight": None, "error": "Couldn't reach the AI provider."}
-
-    parsed = _extract_json("\n".join(t for t in texts if t))
+    sources = result.sources  # [] under Groq (no live search)
+    parsed = _extract_json(result.text)
     if not isinstance(parsed, dict):
-        logger.error("competitor analyze: model reply was not JSON (%r...)", ("".join(texts))[:160])
+        logger.error("competitor analyze: model reply was not JSON (%r...)", result.text[:160])
         return {"configured": True, "insight": None, "error": "AI returned an unreadable response."}
 
     summary = (parsed.get("summary") or "").strip()
@@ -281,16 +243,23 @@ async def analyze_competitor(
     if activity_level not in ("high", "moderate", "low", "none"):
         activity_level = None
 
+    # No live search under Groq: make that unmistakable in the UI by appending the
+    # disclaimer to the summary and flagging it in details (source_urls stays []).
+    if LIVE_SEARCH_DISCLAIMER.split(":")[0] not in summary:
+        summary = f"{summary}\n\n{LIVE_SEARCH_DISCLAIMER}"
+
     insight = {
         "summary": summary,
         "details": {
             "key_points": key_points,
             "activity_level": activity_level,
             "model": used_model,
+            "live_search": False,
+            "note": LIVE_SEARCH_DISCLAIMER,
         },
         "source_urls": sources,
     }
-    logger.info("competitor analyze: '%s' -> %d key point(s), %d source(s) via %s",
+    logger.info("competitor analyze: '%s' -> %d key point(s), %d source(s) via %s (no live search)",
                 name, len(key_points), len(sources), used_model)
     return {"configured": True, "insight": insight}
 
@@ -474,7 +443,7 @@ async def check_now(competitor_id: str, ctx: OrgContext = Depends(require_org)):
     """Run the AI analysis for ONE competitor RIGHT NOW and store the insight.
 
     Respects the per-org monthly cap (this is a billed run). GRACEFUL DORMANCY: with
-    no ANTHROPIC_API_KEY set, returns 200 with configured=false + a clear message —
+    no GROQ_API_KEY set, returns 200 with configured=false + a clear message —
     never a 500 — so the UI can show the "add your key" state.
     """
     try:
@@ -532,7 +501,7 @@ async def check_now(competitor_id: str, ctx: OrgContext = Depends(require_org)):
 # Driven by Cloud Scheduler → POST /api/cron/competitor-sweep (cron.py). Same shape
 # as the prospect-search sweep: settings are read LIVE per pass (resolve_all), so a
 # dashboard edit lands on the very next sweep with no restart. GRACEFUL DORMANCY: if
-# ANTHROPIC_API_KEY is unset the whole sweep no-ops early with a clear reason.
+# GROQ_API_KEY is unset the whole sweep no-ops early with a clear reason.
 # ═════════════════════════════════════════════════════════════════════════════
 async def run_competitor_sweep() -> dict:
     """For EACH org with competitor_intel_enabled, analyse every active competitor

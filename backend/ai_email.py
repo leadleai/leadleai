@@ -2,18 +2,19 @@
 AI-written follow-up emails, grounded in the org's knowledge base.
 
 Given the lead's own enquiry, their name, the follow-up step (1/2/3) and the
-org's KB, this asks Anthropic to write a short, professional email that DIRECTLY
-answers the enquiry using ONLY the knowledge base — and, crucially, to NOT invent
-anything. When the KB doesn't cover the question the model is told to promise a
-specialist will follow up rather than guess.
+org's KB, this asks the AI provider (Groq by default) to write a short,
+professional email that DIRECTLY answers the enquiry using ONLY the knowledge
+base — and, crucially, to NOT invent anything. When the KB doesn't cover the
+question the model is told to promise a specialist will follow up rather than guess.
 
 Everything here is best-effort and NEVER raises to the caller: on a missing key,
-an API error, or an unparseable reply, `generate_followup` returns None and the
-caller (followup.build_followup_content) falls back to the static templates.
+an API error, a rate-limit (429), or an unparseable reply, `generate_followup`
+returns None and the caller (followup.build_followup_content) falls back to the
+static templates.
 
 CONFIG (backend/.env only — never the frontend):
-  ANTHROPIC_API_KEY   the API key. Absent -> AI generation is off.
-  ANTHROPIC_MODEL     model id (default claude-sonnet-5).
+  GROQ_API_KEY        the API key. Absent -> AI generation is off.
+  GROQ_MODEL          optional model override (default groq_client.DEFAULT_MODEL).
   AI_EMAILS_ENABLED   master switch, default false. Toggle here or from Settings.
 """
 import json
@@ -22,19 +23,15 @@ import os
 import re
 from typing import Optional, Tuple
 
-import httpx
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+import ai_provider
 from auth import OrgContext, require_org
 
 logger = logging.getLogger("ai_email")
 
 settings_router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_VERSION = "2023-06-01"
-DEFAULT_MODEL = "claude-sonnet-5"
 
 # What each step is FOR. Kept here so the prompt and the templates stay in step.
 STEP_INTENT = {
@@ -49,16 +46,12 @@ def _env_bool(name: str, default: bool) -> bool:
     return os.environ.get(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
-def _api_key() -> str:
-    return os.environ.get("ANTHROPIC_API_KEY", "").strip()
-
-
 def model() -> str:
-    return os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    return ai_provider.default_model()
 
 
 def api_configured() -> bool:
-    return bool(_api_key())
+    return ai_provider.api_configured()
 
 
 # Master switch (runtime; initialised from env, toggled from Settings) ─────────
@@ -175,12 +168,9 @@ async def generate_followup(
         logger.info("ai email: empty knowledge base; falling back to template")
         return None
 
-    payload = {
-        "model": model(),
-        "max_tokens": 800,
-        "temperature": 0.4,
-        "system": _SYSTEM,
-        "messages": [
+    result = await ai_provider.generate(
+        system=_SYSTEM,
+        messages=[
             {
                 "role": "user",
                 "content": _build_user_prompt(
@@ -188,33 +178,18 @@ async def generate_followup(
                 ),
             }
         ],
-    }
-    headers = {
-        "x-api-key": _api_key(),
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=45) as http:
-            resp = await http.post(ANTHROPIC_URL, headers=headers, json=payload)
-    except Exception as e:
-        logger.error("ai email: request to Anthropic failed: %s", e)
-        return None
-    if resp.status_code >= 400:
-        logger.error("ai email: Anthropic HTTP %s: %s", resp.status_code, resp.text[:300])
+        temperature=0.4,
+        max_output_tokens=800,
+    )
+    if not result.ok:
+        # Missing key, API error, or free-tier rate-limit (429) — fall back to the
+        # static template instead of erroring.
+        logger.error("ai email: generation failed: %s", result.error)
         return None
 
-    try:
-        data = resp.json()
-        blocks = data.get("content") or []
-        text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
-    except Exception as e:
-        logger.error("ai email: could not read Anthropic response: %s", e)
-        return None
-
-    parsed = _extract_json(text)
+    parsed = _extract_json(result.text)
     if not isinstance(parsed, dict):
-        logger.error("ai email: model reply was not JSON (%r...)", text[:120])
+        logger.error("ai email: model reply was not JSON (%r...)", result.text[:120])
         return None
 
     subject = (parsed.get("subject") or "").strip()

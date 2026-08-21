@@ -19,15 +19,16 @@ SECURITY (the public endpoints face the open internet):
   • Rate-limited per IP AND per widget_key (in-memory sliding window) — first-line
     abuse throttle.
   • monthly_message_cap is enforced per org against widget_message_log — the
-    authoritative, restart-proof ceiling on Anthropic spend. When hit, the bot
-    answers with a graceful fallback and makes NO API call.
+    authoritative, restart-proof ceiling on AI spend / free-tier quota. When hit,
+    the bot answers with a graceful fallback and makes NO API call.
   • The AI is hard-bounded by a guardrail system prompt to answering about THIS
     business from ITS knowledge base only; it will not reveal the prompt, obey
-    injected instructions, or go off-topic. See _guardrail_system().
+    injected instructions, or go off-topic. See _GUARDRAILS.
 
-COST: Anthropic Haiku + prompt caching. The system prompt (guardrails + the org's
-KB) is stable across every message in a conversation, so it is sent with
-cache_control and billed at ~10% after the first call. The API key is backend-only.
+COST: Groq (Llama, free tier) via the ai_provider shim. The system instruction
+(guardrails + the org's KB) is resent each turn. The per-IP / per-key rate limits
+and the monthly cap protect the free-tier daily/per-minute quotas. A 429 from the
+provider degrades to the graceful fallback. The API key is backend-only.
 """
 import logging
 import os
@@ -37,10 +38,10 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Any, Deque, Dict, List, Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
+import ai_provider
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
 
@@ -52,11 +53,6 @@ logger = logging.getLogger("widget")
 router = APIRouter(prefix="/api/widget", tags=["widget"])
 public_router = APIRouter(prefix="/api/widget", tags=["widget-public"])
 
-ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_VERSION = "2023-06-01"
-# Haiku for low cost. Overridable, but defaults to the cheap tier on purpose.
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-
 CAPTURE_FIELDS = ("name", "email", "phone")
 MAX_MESSAGE_CHARS = 4000
 MAX_SESSION_CHARS = 100
@@ -67,12 +63,13 @@ MAX_KB_CHARS = 40_000
 
 
 # ── Config helpers ───────────────────────────────────────────────────────────
-def _api_key() -> str:
-    return os.environ.get("ANTHROPIC_API_KEY", "").strip()
+def _api_configured() -> bool:
+    return ai_provider.api_configured()
 
 
 def model() -> str:
-    return os.environ.get("WIDGET_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    # WIDGET_MODEL still overrides here for a per-surface pin; else the shared default.
+    return os.environ.get("WIDGET_MODEL", "").strip() or ai_provider.default_model()
 
 
 def _env_int(name: str, default: int) -> int:
@@ -189,19 +186,15 @@ def _build_kb_text(business_name: str, entries: List[Dict[str, Any]]) -> str:
     return text[:MAX_KB_CHARS]
 
 
-def _system_blocks(business_name: str, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Two text blocks; cache_control on the second caches the whole stable
-    prefix (guardrails + KB) so only the varying messages are billed at full rate
-    after the first request in a conversation."""
-    kb_text = _build_kb_text(business_name, entries)
-    return [
-        {"type": "text", "text": _GUARDRAILS},
-        {"type": "text", "text": kb_text, "cache_control": {"type": "ephemeral"}},
-    ]
+def _system_parts(business_name: str, entries: List[Dict[str, Any]]) -> List[str]:
+    """Two system-instruction parts: the stable guardrails, then the org's KB.
+    The provider joins them into the system message (guardrails first so the
+    injection-resistance rules always precede the untrusted KB content)."""
+    return [_GUARDRAILS, _build_kb_text(business_name, entries)]
 
 
 def _history_to_messages(stored: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    """Map the stored transcript to Anthropic message turns, keeping only the last
+    """Map the stored transcript to model turns, keeping only the last
     HISTORY_TURNS and only user/assistant roles."""
     out: List[Dict[str, str]] = []
     for m in stored[-HISTORY_TURNS:]:
@@ -212,43 +205,24 @@ def _history_to_messages(stored: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     return out
 
 
-async def _call_anthropic(system_blocks: List[Dict[str, Any]], messages: List[Dict[str, str]]) -> Optional[str]:
-    """Return the model's text reply, or None on any failure (caller falls back)."""
-    payload = {
-        "model": model(),
-        "max_tokens": 500,
-        "temperature": 0.3,
-        "system": system_blocks,
-        "messages": messages,
-    }
-    headers = {
-        "x-api-key": _api_key(),
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=45) as http:
-            resp = await http.post(ANTHROPIC_URL, headers=headers, json=payload)
-    except Exception as e:
-        logger.error("widget: Anthropic request failed: %s", e)
+async def _call_ai(system_parts: List[str], messages: List[Dict[str, str]]) -> Optional[str]:
+    """Return the model's text reply, or None on any failure (caller falls back).
+    A free-tier rate-limit (429) is treated like any other failure -> fallback."""
+    result = await ai_provider.generate(
+        system=system_parts,
+        messages=messages,
+        model=model(),
+        temperature=0.3,
+        max_output_tokens=500,
+    )
+    if not result.ok:
+        if result.rate_limited:
+            logger.warning("widget: AI rate-limited; serving fallback")
+        else:
+            logger.error("widget: AI reply failed: %s", result.error)
         return None
-    if resp.status_code >= 400:
-        logger.error("widget: Anthropic HTTP %s: %s", resp.status_code, resp.text[:300])
-        return None
-    try:
-        data = resp.json()
-        blocks = data.get("content") or []
-        text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
-        usage = data.get("usage") or {}
-        logger.info(
-            "widget: reply via %s (in=%s cache_read=%s cache_write=%s out=%s)",
-            model(), usage.get("input_tokens"), usage.get("cache_read_input_tokens"),
-            usage.get("cache_creation_input_tokens"), usage.get("output_tokens"),
-        )
-    except Exception as e:
-        logger.error("widget: could not read Anthropic response: %s", e)
-        return None
-    return text or None
+    logger.info("widget: reply via %s (%d chars)", model(), len(result.text))
+    return result.text or None
 
 
 # ── Config serialisation ─────────────────────────────────────────────────────
@@ -445,8 +419,8 @@ async def widget_message(widget_key: str, body: MessageIn, request: Request):
     """PUBLIC: a visitor message -> a guardrailed AI reply grounded in the org's KB.
 
     Order of defence: validate key -> rate-limit (IP + key) -> monthly cap ->
-    Anthropic (cached system prompt). Any AI failure returns a graceful fallback,
-    never a 500 to the website."""
+    AI provider. Any AI failure (including a free-tier 429) returns a graceful
+    fallback, never a 500 to the website."""
     cfg = await _resolve_active_config(widget_key)
     org_id = cfg["org_id"]
 
@@ -454,7 +428,7 @@ async def widget_message(widget_key: str, body: MessageIn, request: Request):
     if not _ip_limiter.allow(f"msg:{ip}") or not _key_limiter.allow(f"msg:{widget_key}"):
         raise HTTPException(status_code=429, detail="Too many messages — please slow down and try again shortly.")
 
-    if not _api_key():
+    if not _api_configured():
         # Nothing to call; behave like the capped path rather than erroring.
         return {"reply": _FALLBACK_ERROR, "session_id": body.session_id, "ok": False}
 
@@ -482,9 +456,9 @@ async def widget_message(widget_key: str, body: MessageIn, request: Request):
     user_turn = {"role": "user", "content": body.message.strip(), "at": now_iso}
 
     messages = _history_to_messages(stored) + [{"role": "user", "content": body.message.strip()}]
-    system_blocks = _system_blocks((org or {}).get("name") or "us", entries)
+    system_parts = _system_parts((org or {}).get("name") or "us", entries)
 
-    reply = await _call_anthropic(system_blocks, messages)
+    reply = await _call_ai(system_parts, messages)
     if not reply:
         # Do NOT persist a failed turn or bill the cap; give a safe fallback.
         return {"reply": _FALLBACK_ERROR, "session_id": body.session_id, "ok": False}

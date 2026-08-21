@@ -39,6 +39,7 @@ except ImportError:  # pragma: no cover
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+import ai_provider
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
 
@@ -392,7 +393,7 @@ def _configured_flags() -> Dict[str, bool]:
     return {
         "bland_configured": bool(os.environ.get("BLAND_API_KEY")),
         "resend_configured": bool(os.environ.get("RESEND_API_KEY")),
-        "ai_configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "ai_configured": ai_provider.api_configured(),
         "rapidapi_configured": bool(os.environ.get("RAPIDAPI_KEY")),
         "supabase_configured": bool(
             os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_ROLE_KEY")

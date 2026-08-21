@@ -81,8 +81,8 @@ async def prospect_search_sweep(_: bool = Depends(require_cron_secret)):
 async def competitor_sweep(_: bool = Depends(require_cron_secret)):
     """Run one competitor-intel sweep: for each org with the feature on, re-analyse
     every active competitor whose check interval has elapsed (up to the monthly cap),
-    calling Anthropic WITH WEB SEARCH and storing an insight. No-ops cleanly when
-    ANTHROPIC_API_KEY is unset (graceful dormancy)."""
+    calling the AI provider (Groq) and storing an insight. No-ops cleanly
+    when GROQ_API_KEY is unset (graceful dormancy)."""
     logger.info("cron: competitor-sweep triggered")
     result = await competitors.run_competitor_sweep()
     logger.info("cron: competitor-sweep result: %s", result)

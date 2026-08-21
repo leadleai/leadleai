@@ -108,8 +108,8 @@ app.include_router(prospects_router)
 # org_settings; the sweep is prospects.run_prospect_search_sweep via cron.
 app.include_router(saved_searches_router)
 # Competitor / market intelligence: per-org CRUD for tracked competitors + AI
-# web-search analysis into stored insights (org-scoped, RLS). AI is backend-only and
-# gracefully DORMANT until ANTHROPIC_API_KEY is set; the scheduled sweep runs via
+# analysis into stored insights (org-scoped, RLS). AI is backend-only and gracefully
+# DORMANT until GROQ_API_KEY is set; the scheduled sweep runs via
 # competitors.run_competitor_sweep (cron /api/cron/competitor-sweep).
 app.include_router(competitors_router)
 app.include_router(calls_router)
