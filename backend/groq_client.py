@@ -33,6 +33,7 @@ CONFIG (backend/.env only — never the frontend):
 """
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
@@ -103,6 +104,28 @@ def _to_openai_messages(
     return out
 
 
+# Groq's agentic "compound" models report each web search they ran under
+# message.executed_tools; every search's `output` is a text blob of
+# "Title: ...\nURL: ...\nContent: ..." entries. This pulls the (title, url) pairs
+# out as citations. Non-agentic models (gpt-oss etc.) have no executed_tools, so
+# this returns [] for them.
+_SEARCH_RESULT_RE = re.compile(r"Title:\s*(.*?)\s*[\r\n]+URL:\s*(\S+)", re.IGNORECASE)
+
+
+def _extract_sources(message: Dict[str, Any]) -> List[Dict[str, str]]:
+    sources: List[Dict[str, str]] = []
+    seen: set = set()
+    for tool in message.get("executed_tools") or []:
+        if tool.get("type") not in ("search", "web_search", None):
+            continue
+        for title, url in _SEARCH_RESULT_RE.findall(tool.get("output") or ""):
+            url = url.strip().rstrip(".,);]")
+            if url and url not in seen:
+                seen.add(url)
+                sources.append({"url": url, "title": title.strip()})
+    return sources
+
+
 # ── The one call everything goes through ─────────────────────────────────────
 async def generate(
     *,
@@ -146,6 +169,13 @@ async def generate(
         logger.warning("groq: rate limited (HTTP 429)%s: %s", hint, resp.text[:200])
         return GroqResult(ok=False, rate_limited=True, status_code=429,
                           error=f"AI rate-limited (Groq free-tier quota).{hint} Try again shortly.")
+    if resp.status_code == 413:
+        # "request_too_large": the request (with the compound model's injected web
+        # search results) exceeded the tier's max-tokens-per-request limit. Common
+        # on the free tier for agentic search; callers should fall back cleanly.
+        logger.warning("groq: request too large (HTTP 413): %s", resp.text[:200])
+        return GroqResult(ok=False, status_code=413,
+                          error="AI request too large (Groq free-tier limit for web search).")
     if resp.status_code >= 400:
         logger.error("groq: HTTP %s: %s", resp.status_code, resp.text[:300])
         return GroqResult(ok=False, status_code=resp.status_code,
@@ -165,10 +195,12 @@ async def generate(
 
     message = choices[0].get("message") or {}
     text = (message.get("content") or "").strip()
+    # Citations from any web searches the (compound) model ran; [] for plain models.
+    sources = _extract_sources(message)
     if not text:
         finish = choices[0].get("finish_reason") or "unknown"
         logger.error("groq: empty content (finish_reason=%s)", finish)
-        return GroqResult(ok=False, status_code=resp.status_code,
+        return GroqResult(ok=False, status_code=resp.status_code, sources=sources,
                           error=f"AI returned an empty answer ({finish}).")
 
-    return GroqResult(ok=True, text=text, status_code=resp.status_code)
+    return GroqResult(ok=True, text=text, sources=sources, status_code=resp.status_code)

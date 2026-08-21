@@ -2,26 +2,30 @@
 COMPETITOR / MARKET INTELLIGENCE.
 
 An org adds COMPETITORS (name + website). On a schedule — and on demand via a
-"check now" button — this asks the AI provider (Groq/Llama by default) to profile
-each competitor from its name / website / user notes and summarise it into a clean
+"check now" button — this asks Groq's agentic "compound" model, which does LIVE
+web search server-side, to research each competitor and summarise it into a clean
 INSIGHT:
 
-    summary        one short paragraph profiling the competitor
+    summary        one short paragraph of recent activity
     key_points     3–6 crisp bullets
-    source_urls    always [] under Groq (no live search — see NOTE below)
+    source_urls    the web pages compound actually searched/cited
 
-NOTE — NO LIVE WEB SEARCH: the previous provider (Gemini) grounded these insights
-with live Google Search. Groq/Llama has NO server-side web search, so insights are
-now generated from the MODEL'S OWN TRAINING KNOWLEDGE — general and possibly out of
-date, not live news. We make this explicit: every insight carries
-details.live_search=False and a plain-language disclaimer appended to the summary,
-so the Market Watch UI shows it isn't live-searching. (details.source_urls stays
-empty, which the UI already renders as "no sources".)
+LIVE WEB SEARCH: COMPETITOR_MODEL ("groq/compound") runs its own web searches and
+reads the results before answering; groq_client harvests the cited pages from the
+response's executed_tools onto result.sources, so the dashboard shows real links
+and details.live_search=True.
+
+GRACEFUL FALLBACK: if compound errors, is rate-limited (429), or exceeds the free
+tier's per-request size (413), we retry once with COMPETITOR_FALLBACK_MODEL (a
+plain, no-search Groq model) which profiles from training knowledge. That path
+sets details.live_search=False, source_urls=[], and appends a "not a live web
+search" disclaimer to the summary — so the feature stays functional and honest.
 
 Insights are stored (public.competitor_insights) so the Market Watch dashboard can
 show the latest one per competitor and when it was last checked.
 
-COST CONTROL — the AI call is the ONLY thing that consumes quota, so:
+COST CONTROL — the AI call is the ONLY thing that consumes quota, and agentic web
+search costs more per run, so the per-org monthly cap matters:
   * a cost-conscious model (free tier, configurable) is used,
   * each competitor is re-checked at most every competitor_check_frequency_hours,
   * and a per-org MONTHLY CAP (competitor_max_per_month) bounds total AI runs.
@@ -58,7 +62,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-import ai_provider
+import groq_client
 import org_settings
 import supabase_client as sb
 from auth import OrgContext, require_org, sb_error
@@ -67,6 +71,23 @@ logger = logging.getLogger("competitors")
 router = APIRouter(prefix="/api/competitors", tags=["competitors"])
 
 # ── AI config (key is backend-only, never the browser) ───────────────────────
+# Competitor intel is bound to GROQ directly (independent of the global PROVIDER),
+# because it uses Groq's agentic "compound" model, which does LIVE web search
+# server-side. If compound fails/limits out, we fall back to a plain Groq model
+# that summarises from training knowledge (with a disclaimer) so the feature never
+# breaks.
+#
+# ┌─ COMPETITOR_MODEL — the live-web-search model (override via env) ──────────┐
+# │ "groq/compound" runs Google-style web search + reads results server-side,  │
+# │ returning both an answer and the pages it searched (message.executed_tools,│
+# │ from which groq_client extracts citations). "groq/compound-mini" is a       │
+# │ lighter/cheaper variant. Override per-deploy with COMPETITOR_MODEL.         │
+# └────────────────────────────────────────────────────────────────────────────┘
+COMPETITOR_MODEL = "groq/compound"
+# Graceful fallback when compound errors, rate-limits (429), or exceeds the free
+# tier's per-request size (413): a plain Groq chat model with NO web search.
+COMPETITOR_FALLBACK_MODEL = "openai/gpt-oss-120b"
+
 # Bounded so one analysis stays cheap and predictable.
 MAX_TOKENS = 1024
 REQUEST_TIMEOUT_SECONDS = 90.0
@@ -76,8 +97,8 @@ NOT_CONFIGURED_MESSAGE = (
     "AI not configured — add GROQ_API_KEY to enable competitor intelligence."
 )
 
-# Appended to every summary so the dashboard makes clear these insights are NOT a
-# live web search (Groq/Llama has none) but the model's own general knowledge.
+# Appended to a summary ONLY on the fallback path (no live search), so the
+# dashboard makes clear that insight is the model's general knowledge, not live.
 LIVE_SEARCH_DISCLAIMER = (
     "Note: this profile is generated from the AI model's general knowledge, not a "
     "live web search, so it may be out of date."
@@ -90,12 +111,17 @@ AVG_HOURS_PER_MONTH = 730.0
 
 # ── config helpers ───────────────────────────────────────────────────────────
 def api_configured() -> bool:
-    return ai_provider.api_configured()
+    return groq_client.api_configured()
 
 
 def model() -> str:
-    # COMPETITOR_MODEL pins this surface if set; else the shared provider default.
-    return os.environ.get("COMPETITOR_MODEL", "").strip() or ai_provider.default_model()
+    # The live-web-search model. COMPETITOR_MODEL env overrides the constant.
+    return os.environ.get("COMPETITOR_MODEL", "").strip() or COMPETITOR_MODEL
+
+
+def fallback_model() -> str:
+    # Plain (no-search) model used when the search model fails/limits out.
+    return os.environ.get("COMPETITOR_FALLBACK_MODEL", "").strip() or COMPETITOR_FALLBACK_MODEL
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -136,18 +162,40 @@ class CompetitorOut(BaseModel):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# THE AI ANALYSIS — one AI call, NO live web search (Groq/Llama has none).
+# THE AI ANALYSIS — Groq compound (LIVE web search) with a graceful fallback.
 # ─────────────────────────────────────────────────────────────────────────────
-# We send ONE request describing the competitor (name / website / user notes) and
-# ask the model to profile it from its OWN training knowledge. There is no live
-# search and therefore no cited sources (result.sources is always empty), so the
-# prompt forbids fabricating specific recent events/dates, and the stored summary
-# carries an explicit "not a live web search" disclaimer for the dashboard. We
-# parse a small JSON object (summary + key_points + activity_level) from the text.
-# (Grounded live search was Gemini-specific; to restore it, set PROVIDER=gemini and
-# re-enable search=True below — the Gemini client still collects grounding sources.)
+# PRIMARY: one request to COMPETITOR_MODEL ("groq/compound"). Compound runs web
+# searches SERVER-SIDE for the competitor, reads the pages, and answers. groq_client
+# harvests the cited pages from message.executed_tools onto result.sources. We ask
+# for a JSON object (summary + key_points + activity_level) and parse it from the
+# text; if the searched answer isn't clean JSON we still keep it (see _from_search).
+# This path sets details.live_search=True and populates source_urls with real links.
+#
+# FALLBACK: if compound errors / is rate-limited (429) / exceeds the free-tier
+# per-request size (413), we retry once with COMPETITOR_FALLBACK_MODEL (a plain, no-
+# search Groq model) which profiles from training knowledge. That path sets
+# live_search=False and appends the "not a live web search" disclaimer, so the
+# feature stays functional and honest even when live search is unavailable.
 # ═════════════════════════════════════════════════════════════════════════════
-_SYSTEM = (
+
+# System prompt for the LIVE-SEARCH (compound) path.
+_SYSTEM_SEARCH = (
+    "You are a market-intelligence analyst with a LIVE web search tool. First, search "
+    "the web for RECENT, material information about the SPECIFIED competitor company — "
+    "news, product launches, pricing changes, promotions/offers, funding, partnerships, "
+    "notable hiring, or market moves from roughly the last few months. Prefer primary "
+    "and reputable sources. Do NOT invent facts; if searches turn up nothing recent, "
+    "say so plainly. "
+    "After searching, respond with ONLY a JSON object (no prose, no markdown, no code "
+    'fences), shaped exactly as: {"summary": "<2-4 sentence overview of what is recent>", '
+    '"key_points": ["<short bullet>", "..."], '
+    '"activity_level": "<one of: high, moderate, low, none>"}. '
+    "Keep key_points to 3-6 crisp, factual bullets. Do not put URLs in the JSON — the "
+    "source links are collected automatically from your searches."
+)
+
+# System prompt for the FALLBACK (no-search) path — training knowledge only.
+_SYSTEM_KNOWLEDGE = (
     "You are a market-intelligence analyst. You do NOT have live web access, so work "
     "ONLY from what you already know about the SPECIFIED competitor company from the "
     "name, website, and any context provided. Give a concise general profile: what the "
@@ -163,16 +211,18 @@ _SYSTEM = (
 )
 
 
-def _build_user_prompt(*, name: str, website: Optional[str], notes: Optional[str]) -> str:
-    lines = [f"COMPETITOR TO PROFILE: {name}"]
+def _build_user_prompt(*, name: str, website: Optional[str], notes: Optional[str], live: bool) -> str:
+    lines = [f"COMPETITOR TO RESEARCH: {name}" if live else f"COMPETITOR TO PROFILE: {name}"]
     if website:
         lines.append(f"WEBSITE: {website}")
     if notes:
         lines.append(f"CONTEXT (from the user, may help disambiguate): {notes.strip()}")
-    lines.append(
-        "\nProfile this company from your own knowledge and return the JSON object "
-        "described in the system prompt."
-    )
+    if live:
+        lines.append("\nSearch the web for this company's recent activity and return ONLY "
+                     "the JSON object described in the system prompt.")
+    else:
+        lines.append("\nProfile this company from your own knowledge and return the JSON "
+                     "object described in the system prompt.")
     return "\n".join(lines)
 
 
@@ -197,70 +247,119 @@ def _extract_json(text: str) -> Optional[dict]:
     return None
 
 
+def _build_insight(
+    *, text: str, sources: List[Dict[str, str]], used_model: str, live_search: bool
+) -> Optional[Dict[str, Any]]:
+    """Turn a model reply into the stored insight shape, or None if unusable.
+
+    Parses the JSON object the prompt asks for. On the live path, if the searched
+    answer isn't clean JSON we still salvage it (text as the summary) rather than
+    throw away a real web search. On the fallback path we append the disclaimer and
+    flag live_search=False. source_urls carries the citations (real ones on the
+    live path, [] on the fallback path).
+    """
+    parsed = _extract_json(text)
+    if isinstance(parsed, dict):
+        summary = (parsed.get("summary") or "").strip()
+        key_points = [str(p).strip() for p in (parsed.get("key_points") or []) if str(p).strip()]
+        activity_level = (parsed.get("activity_level") or "").strip().lower()
+        if activity_level not in ("high", "moderate", "low", "none"):
+            activity_level = None
+    elif live_search and text.strip():
+        # Compound searched but replied in prose/markdown — keep the searched answer
+        # (trimmed) instead of discarding a genuine live-search result.
+        summary = text.strip()[:1500]
+        key_points, activity_level = [], None
+    else:
+        return None
+
+    if not summary:
+        return None
+
+    if not live_search and LIVE_SEARCH_DISCLAIMER.split(":")[0] not in summary:
+        # No live search: make that unmistakable in the UI (source_urls stays []).
+        summary = f"{summary}\n\n{LIVE_SEARCH_DISCLAIMER}"
+
+    details: Dict[str, Any] = {
+        "key_points": key_points,
+        "activity_level": activity_level,
+        "model": used_model,
+        "live_search": live_search,
+    }
+    if not live_search:
+        details["note"] = LIVE_SEARCH_DISCLAIMER
+    return {"summary": summary, "details": details, "source_urls": sources if live_search else []}
+
+
 async def analyze_competitor(
     *, name: str, website: Optional[str] = None, notes: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Profile one competitor via the AI provider (Groq, no live search), returning a dict.
-
-    NEVER raises — the caller (request path or sweep) always gets a structured dict:
+    """Research one competitor via Groq compound (LIVE web search), with a graceful
+    fallback to a plain no-search model. Returns a structured dict; NEVER raises:
 
       {"configured": False, "message": NOT_CONFIGURED_MESSAGE}      # no API key
       {"configured": True, "insight": {summary, details, source_urls}}  # success
-      {"configured": True, "insight": None, "error": "<why>"}       # API/parse/429 error
+      {"configured": True, "insight": None, "error": "<why>"}       # 429 / total failure
 
-    `insight` is exactly the shape stored in competitor_insights (source_urls is []
-    since there is no live search under Groq).
+    `insight` is exactly the shape stored in competitor_insights. On the live path
+    details.live_search=True and source_urls holds the cited pages; on the fallback
+    path details.live_search=False and source_urls is [].
     """
     if not api_configured():
         return {"configured": False, "message": NOT_CONFIGURED_MESSAGE}
 
-    used_model = model()
-    result = await ai_provider.generate(
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": _build_user_prompt(name=name, website=website, notes=notes)}],
-        model=used_model,
+    # ── PRIMARY: live web search via compound ────────────────────────────────
+    search_model = model()
+    result = await groq_client.generate(
+        system=_SYSTEM_SEARCH,
+        messages=[{"role": "user",
+                   "content": _build_user_prompt(name=name, website=website, notes=notes, live=True)}],
+        model=search_model,
+        temperature=0.3,
         max_output_tokens=MAX_TOKENS,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
-    if not result.ok:
-        # Includes the free-tier 429: surface as an error (no insight) so the run
-        # isn't stamped and retries on the next manual check / sweep.
-        logger.warning("competitor analyze: '%s' failed: %s", name, result.error)
-        return {"configured": True, "insight": None, "error": result.error or "AI analysis failed."}
+    if result.ok:
+        insight = _build_insight(text=result.text, sources=result.sources,
+                                 used_model=search_model, live_search=True)
+        if insight:
+            logger.info("competitor analyze: '%s' -> %d key point(s), %d source(s) via %s (LIVE search)",
+                        name, len(insight["details"]["key_points"]), len(insight["source_urls"]), search_model)
+            return {"configured": True, "insight": insight}
+        logger.warning("competitor analyze: '%s' live reply unusable; falling back", name)
+    elif result.rate_limited:
+        # 429: don't burn the (also-limited) fallback on a billed run — surface it so
+        # last_checked_at isn't stamped and the next check/sweep retries.
+        logger.warning("competitor analyze: '%s' rate-limited: %s", name, result.error)
+        return {"configured": True, "insight": None, "error": result.error or "AI rate-limited."}
+    else:
+        # Other compound failure (e.g. 413 request-too-large on the free tier, model
+        # unavailable). Fall through to the no-search fallback so the feature works.
+        logger.warning("competitor analyze: '%s' compound failed (%s); falling back to %s",
+                       name, result.error, fallback_model())
 
-    sources = result.sources  # [] under Groq (no live search)
-    parsed = _extract_json(result.text)
-    if not isinstance(parsed, dict):
-        logger.error("competitor analyze: model reply was not JSON (%r...)", result.text[:160])
+    # ── FALLBACK: no-search profile from training knowledge ──────────────────
+    fb_model = fallback_model()
+    fb = await groq_client.generate(
+        system=_SYSTEM_KNOWLEDGE,
+        messages=[{"role": "user",
+                   "content": _build_user_prompt(name=name, website=website, notes=notes, live=False)}],
+        model=fb_model,
+        temperature=0.4,
+        max_output_tokens=MAX_TOKENS,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    if not fb.ok:
+        logger.warning("competitor analyze: '%s' fallback failed: %s", name, fb.error)
+        return {"configured": True, "insight": None, "error": fb.error or "AI analysis failed."}
+
+    insight = _build_insight(text=fb.text, sources=[], used_model=fb_model, live_search=False)
+    if not insight:
+        logger.error("competitor analyze: '%s' fallback reply not JSON (%r...)", name, fb.text[:160])
         return {"configured": True, "insight": None, "error": "AI returned an unreadable response."}
 
-    summary = (parsed.get("summary") or "").strip()
-    if not summary:
-        return {"configured": True, "insight": None, "error": "AI returned an empty summary."}
-
-    key_points = [str(p).strip() for p in (parsed.get("key_points") or []) if str(p).strip()]
-    activity_level = (parsed.get("activity_level") or "").strip().lower()
-    if activity_level not in ("high", "moderate", "low", "none"):
-        activity_level = None
-
-    # No live search under Groq: make that unmistakable in the UI by appending the
-    # disclaimer to the summary and flagging it in details (source_urls stays []).
-    if LIVE_SEARCH_DISCLAIMER.split(":")[0] not in summary:
-        summary = f"{summary}\n\n{LIVE_SEARCH_DISCLAIMER}"
-
-    insight = {
-        "summary": summary,
-        "details": {
-            "key_points": key_points,
-            "activity_level": activity_level,
-            "model": used_model,
-            "live_search": False,
-            "note": LIVE_SEARCH_DISCLAIMER,
-        },
-        "source_urls": sources,
-    }
-    logger.info("competitor analyze: '%s' -> %d key point(s), %d source(s) via %s (no live search)",
-                name, len(key_points), len(sources), used_model)
+    logger.info("competitor analyze: '%s' -> %d key point(s) via %s (fallback, no live search)",
+                name, len(insight["details"]["key_points"]), fb_model)
     return {"configured": True, "insight": insight}
 
 
